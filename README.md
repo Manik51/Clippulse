@@ -5,8 +5,8 @@
 <h1 align="center">ClipPulse</h1>
 
 <p align="center">
-  Turn a long YouTube video into 30-second 9:16 Shorts — find the best moment, cut it, caption it, render it.<br>
-  Locally, free, on your own machine.
+  Turn a long YouTube video into 9:16 Shorts — find the best moment, cut it, caption it, render it.<br>
+  30s, 45s, 60s, or any length from 10–180 seconds. Locally, free, on your own machine.
 </p>
 
 <p align="center">
@@ -60,7 +60,7 @@ moments and verified frame by frame; the full index is in
 ![How ClipPulse works: paste a link or fetch trends → smart analyze → 4 clips scored → DOAC render and download](assets/flow.svg)
 
 1. **Paste a link, or fetch trends** — any YouTube link (watch, youtu.be, Shorts, live, embed, or a bare video ID), or the trending long videos of 10 default creators, re-sorted by real view count.
-2. **Smart analyze** — the full video is transcribed with real Whisper speech-to-text, and a real audio-energy profile is measured. A sliding window scores every 30-second moment on hook strength, payoff, emotion and audio peaks.
+2. **Smart analyze** — the full video is transcribed with real Whisper speech-to-text, and a real audio-energy profile is measured. A sliding window scores every moment at your chosen clip length (30s by default) on hook strength, payoff, emotion and audio peaks.
 3. **4 clips, scored** — the top 4 non-overlapping moments, each with a suggested title and hook. Preview each one in the page.
 4. **Render & download** — local MP4 via ffmpeg in 720p, 1080p or 4K, with the DOAC edit style and burned-in captions.
 
@@ -160,7 +160,7 @@ clippulse/
 ├── assets/                 # Logo (SVG + PNG), flow diagram, demo GIF, screenshots, how-to visual
 ├── examples/               # The approved DOAC sample clip + 7 caption-style showcases
 ├── renders/                # Your rendered clips (git-ignored)
-└── PRODUCTION-READY.md     # Full build history, v1 → v8.5
+└── PRODUCTION-READY.md     # Full build history, v1 → v8.6
 ```
 
 ## Roadmap

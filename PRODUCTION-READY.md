@@ -351,3 +351,18 @@ Manik asked for ClipPulse to install with a single command, and for simple insta
 - First test run failed for a test-setup reason, not a script bug: the clone went to `/tmp` (512MB tmpfs, 80% full) and `npm install` died with ENOSPC. Lesson recorded: never test-install into `/tmp`; the home disk has 109GB free.
 - Re-run with `CLIPPULSE_DIR=~/workspace/clippulse-install-test`: clone + `.env` + 229MB `node_modules` + YuNet model download all completed; script printed "Install done (--no-start)". The fresh clone then served `/api/health` OK on PORT=3100 (main server holds :3000). Main server was briefly stopped by a mistaken kill during the test and restarted immediately — health OK after.
 - Tests 35/35, lint + build clean. Pushed as commit 2be6c91 (README + install.sh + setup-local.sh).
+
+## v8.6 — Clip lengths: 30s / 45s / 60s / custom (2026-11-17)
+
+Manik asked why clips are 30 seconds, then ordered every size mentioned added. The 30s length was never a rule — it was the default the scoring window was built around (short clips finish, completion helps the algorithm). Now the length is a choice, not a fixed value.
+
+### What changed
+- One shared rule in `src/lib/virality.ts`: `normalizeClipLengthSec(value)` + `CLIP_LENGTH_PRESETS = [30, 45, 60]`, min 10s, max 180s, default 30s. Missing/invalid → 30s fallback; out-of-range numbers are clamped (5 → 10, 300 → 180), not rejected; whole seconds only.
+- `/api/smart-analyze` accepts `clipLengthSec` (legacy `windowSec` still works as an alias) and scores windows of that length; the response echoes `clipLengthSec` + `windowSec`. `/api/render-local-mp4` accepts `clipLengthSec` to override the end-derived length. Bug found on the way: `clipDuration = Math.min(60, …)` silently cut any 90s/180s clip to 60s — cap raised to 180.
+- UI: a "Clip length" picker in the Trending Clips header card, next to Quality/Framing — preset buttons 30s / 45s / 60s + a Custom seconds box (10–180). Analyze and render both use the picked length.
+- Tests 39/39 (4 new: fallback, clamp, 45s windows, 60s windows). Lint + build clean.
+
+### Verification (live server API)
+- Smart-analyze, 45s: Boxing 8HKI1fGaQ8M (279s), job b86d0afc — top windows all exactly 45s (160–205s score 75.3, 155–200 73.6, 140–185 73.0).
+- Render, 45s at 720p: job 48c7bbba, karaoke captions, sports-blur — ffprobe: 720×1280, duration exactly 45.000000s.
+- Pushed as commit 20a409b (virality.ts, server.ts, TrendingClipsPanel.tsx, virality.test.ts). Repo now 18 commits.
