@@ -335,3 +335,19 @@ Manik ordered 5–7 more showcase videos, each with a different subtitle design,
 
 ### VM restart mid-job
 - The VM restarted at ~22:23 IST, wiping `/tmp` (the showcase scripts, the push manifest, the render logs). All workspace files survived. The server was restarted and is live; the manifest must be regenerated before the push.
+
+## v8.5 — One-command install (2026-11-17)
+
+Manik asked for ClipPulse to install with a single command, and for simple install guides for AI code agents (Claude Code, Antigravity, Codex, opencode and others — the guides live outside this repo, in his files).
+
+### `scripts/install.sh` (new)
+- One line installs everything (Mac, Linux, or Git Bash on Windows):
+  `curl -fsSL https://raw.githubusercontent.com/Manik51/Clippulse/main/scripts/install.sh | bash`
+- It checks for Git + Node.js first (clear error + download link if missing), clones the repo to `~/Clippulse` (or pulls latest if already there), runs `scripts/setup-local.sh`, then starts `npm run prod` in the foreground. `CLIPPULSE_DIR` overrides the folder; `--no-start` installs without starting (used for testing).
+- README Quickstart now leads with this one-liner; the manual 4-step install stays as a fallback.
+- `setup-local.sh` fixes in this pass: final message corrected (`npm run dev` → `npm run prod`), and the optional pip step now passes `--break-system-packages` (Debian/Ubuntu pip refuses `--user` installs without it, PEP 668 — the packages are optional, failure was already tolerated).
+
+### Verification (fresh clone, this VM)
+- First test run failed for a test-setup reason, not a script bug: the clone went to `/tmp` (512MB tmpfs, 80% full) and `npm install` died with ENOSPC. Lesson recorded: never test-install into `/tmp`; the home disk has 109GB free.
+- Re-run with `CLIPPULSE_DIR=~/workspace/clippulse-install-test`: clone + `.env` + 229MB `node_modules` + YuNet model download all completed; script printed "Install done (--no-start)". The fresh clone then served `/api/health` OK on PORT=3100 (main server holds :3000). Main server was briefly stopped by a mistaken kill during the test and restarted immediately — health OK after.
+- Tests 35/35, lint + build clean. Pushed as commit 2be6c91 (README + install.sh + setup-local.sh).
