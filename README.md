@@ -158,9 +158,9 @@ clippulse/
 │   └── components/         # TrendingClipsPanel, ExportModal, TopBar
 ├── scripts/                # PySceneDetect, YuNet face detection, thumbnails
 ├── assets/                 # Logo (SVG + PNG), flow diagram, demo GIF, screenshots, how-to visual
-├── examples/               # The approved DOAC sample clip + 7 caption-style showcases
+├── examples/               # The approved DOAC sample clip + 8 caption-style showcases
 ├── renders/                # Your rendered clips (git-ignored)
-└── PRODUCTION-READY.md     # Full build history, v1 → v8.6
+└── PRODUCTION-READY.md     # Full build history, v1 → v8.7
 ```
 
 ## Roadmap

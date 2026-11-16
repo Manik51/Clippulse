@@ -366,3 +366,35 @@ Manik asked why clips are 30 seconds, then ordered every size mentioned added. T
 - Smart-analyze, 45s: Boxing 8HKI1fGaQ8M (279s), job b86d0afc — top windows all exactly 45s (160–205s score 75.3, 155–200 73.6, 140–185 73.0).
 - Render, 45s at 720p: job 48c7bbba, karaoke captions, sports-blur — ffprobe: 720×1280, duration exactly 45.000000s.
 - Pushed as commit 20a409b (virality.ts, server.ts, TrendingClipsPanel.tsx, virality.test.ts). Repo now 18 commits.
+
+## v8.7 — Eight distinct animated caption styles (2026-11-17)
+
+Manik's complaint, after seeing the v8.4 showcase: all the subtitles look the same — and he was right. A frame check showed karaoke, lime, top and flash all reading as big yellow/white bold caps (doac similar), only minimal and sentence clearly different. He shared an OpusClip-style gallery as the reference: every style with its own font, its own highlight and its own motion — and every one animated, none still.
+
+### The green flash frame: source content, not a bug
+The flash clip's 5s frame is a solid-looking green screen with red "SHEIKH" text. Verified against YouTube's own storyboard sprites for Raj sRH-XlBE2cQ: the ~90s tile is the identical shot — green-graded archival footage of Khalid Sheikh Mohammed with red titles burned into the source. The 85–115s window is a documentary segment. A render bug would be a flat field; these frames have full photographic detail. No code fix needed. Flash's showcase moved to the bright Raj talking-head moment 1440–1470s (same moment as `top`, so the two compare on identical footage).
+
+### Preset rebuild (`CAPTION_STYLE_PRESETS`, virality.ts)
+`doac` untouched (locked standard); `karaoke` unchanged (Hormozi identity). Every other style rebuilt with its own font + highlight + position + motion:
+
+| Style | Font | Highlight / position | Motion |
+|---|---|---|---|
+| minimal | Montserrat ExtraBold 40 | white/light-grey, **bottom-left** | fade-in per word |
+| bold (new) | Alfa Slab One 64 | black text on solid **yellow box that follows the spoken word** (new `wordbox` mode) | pop-in 115 |
+| lime | Poppins ExtraBold 66 | lime with **neon glow** | glow pulse (blur 4→1 decay) |
+| sentence | Noto Sans 46 | black box, full sentences | **typewriter** reveal (unrevealed words grey) |
+| top | Lilita One 56 | yellow/white, **top-centre** | flip-in (`\fry` 80→0) |
+| flash | Bebas Neue 130 | **white with thick red outline**, centre | bounce (150→90→100) |
+
+Preset interface gained `secondaryColour` (the `\kf` sweep's start colour) and `motion` (`pop|fade|pulse|flip|bounce|sweep|wordbox|typewriter`); a `motionTag()` builder emits the per-word `\t` transforms. New free OFL fonts in `~/.fonts`, wired into `scripts/setup-local.sh`: Poppins ExtraBold, Alfa Slab One, Lilita One.
+
+### Real bug found: libass draws the BorderStyle-3 box from OutlineColour, not BackColour
+The first bold render came out a BLACK box with near-invisible dark-grey text. Proven with an isolated 2-line ASS test: the opaque box colour comes from `OutlineColour`. Fix: bold's `outlineColour` is yellow too (both fields set). Documented in the preset-interface comment; covered by a test asserting the three colour fields. Sentence/HookBanner unaffected (their outline and back colours are both dark).
+
+### Verification (live server API, driver regression-v87.ts — scratch, not pushed)
+- Tests 40/40 (39 existing + 1 new distinctness test: all 8 fonts pairwise distinct, all 8 motions pairwise distinct, per-style ASS tags asserted). v8.6 clip-length tests pass unchanged. Lint + build clean.
+- Six renders at 720p, all frame-checked at 0/5/15/25s + RMS clean: Raj top (1440–1470s), Apex lime (2290–2320s), Boxing minimal (225–255s), Boxing bold (225–255s, re-rendered after the box fix), MrBeast sentence (1200–1230s), Raj flash (1440–1470s, new moment).
+- Motion pairs (frames ~0.15s apart inside one spoken word, mean-abs-diff + visual check) — ALL confirmed: top flip (edge-on sliver → full-size), lime pulse (heavy blur → settled glow), minimal fade (grey → bright white), bold wordbox (box follows word), sentence typewriter (grey → white), flash bounce (huge → settling). No style is static.
+- Showcase files replaced locally for the 6 changed styles (clip.mp4 + thumb.jpg + clip.gif, all ≤25MB): `examples/styles/{minimal,bold,lime,sentence,top,flash}/` — `bold/` is a new folder. `karaoke` and `doac` untouched.
+- Pushed as commit f4f3a75 (virality.ts, virality.test.ts, ReelPreviewPanel.tsx, setup-local.sh) + docs commit. Repo now 20 commits.
+- Pre-existing, not fixed here: the raj-top/flash hook pick is a mid-sentence fragment ("six children, and six men…") — the known open hook-selection follow-up; the hook banner + top caption stack at the top for the first 2.8s (same as v8.4).
