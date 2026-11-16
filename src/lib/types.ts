@@ -1,6 +1,6 @@
 export type LanguageMode = 'en' | 'bn';
 
-export type CaptionStyle = 'karaoke' | 'minimal' | 'bold';
+export type CaptionStyle = 'karaoke' | 'minimal' | 'bold' | 'lime' | 'sentence' | 'top' | 'flash';
 
 export type WorkspaceTab = 'workbench' | 'blueprint' | 'trending';
 

@@ -463,6 +463,43 @@ test('v8 generateAssSubtitle popScale parameter (118 default, 130 punchy)', () =
   assert.ok(!pop.includes('fscx118'));
 });
 
+test('v8.3 caption styles: seven distinct designs, real installed fonts', () => {
+  const segs = [{ start: 85, end: 88, text: 'Leader of Al-Qaeda.', words: [
+    { word: 'Leader', start: 85, end: 85.4 },
+    { word: 'of', start: 85.4, end: 85.6 },
+    { word: 'Al-Qaeda.', start: 85.6, end: 86.1 },
+  ] }] as any;
+  const styleLine = (ass: string) => ass.split('\n').find((l) => l.startsWith('Style: Karaoke,'))!;
+  // Hormozi stays Anton yellow with pop.
+  assert.ok(styleLine(generateAssSubtitle(segs, 85, 115, '', 'karaoke')).includes('Anton,72,'));
+  // Minimal is Montserrat ExtraBold white, no pop (was DM Sans -> DejaVu fallback).
+  const minimal = generateAssSubtitle(segs, 85, 115, '', 'minimal');
+  assert.ok(styleLine(minimal).includes('Montserrat ExtraBold,54,'));
+  const minimalWordEvents = minimal.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
+  assert.ok(minimalWordEvents.length > 0);
+  assert.ok(minimalWordEvents.every((l) => !l.includes('fscx')));
+  // Lime Pop: Anton, lime highlight, stronger pop.
+  const lime = generateAssSubtitle(segs, 85, 115, '', 'lime');
+  assert.ok(styleLine(lime).includes('&H0035F1C6'));
+  assert.ok(lime.includes('fscx130'));
+  // Sentence: opaque-box style, one event per segment, full sentence text.
+  // (v8.4: Outline 2 — libass draws no box with BorderStyle=3 + Outline=0.)
+  const sentence = generateAssSubtitle(segs, 85, 115, '', 'sentence');
+  assert.ok(styleLine(sentence).includes('Noto Sans,46,'));
+  assert.ok(styleLine(sentence).includes(',3,2,0,2,60,60,260,1'));
+  assert.ok(sentence.includes('Leader of Al-Qaeda.'));
+  // Top karaoke: top-centre alignment, close to the top edge (v8.4: 150,
+  // was 560 — captions landed ~29% down the frame, across faces).
+  const top = generateAssSubtitle(segs, 85, 115, '', 'top');
+  assert.ok(styleLine(top).includes(',1,5,0,8,60,60,150,1'));
+  // Word Flash: Bebas Neue 120pt, middle-centre, one event per word.
+  const flash = generateAssSubtitle(segs, 85, 115, '', 'flash');
+  assert.ok(styleLine(flash).includes('Bebas Neue,120,'));
+  assert.ok(styleLine(flash).includes(',1,6,0,5,60,60,0,1'));
+  const flashEvents = flash.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
+  assert.equal(flashEvents.length, 3);
+});
+
 test('v8 buildDoacBlurFill is a 4:5 centre crop on a blurred 9:16 fill', () => {
   const f720 = buildDoacBlurFill(720, 1280);
   assert.ok(f720.includes('boxblur=16:3[bg]'));
@@ -499,12 +536,15 @@ test('v8.2 buildDoacSceneChain: letterbox is 720x405, crop45 is the 4:5 chain', 
   assert.ok(crop.includes('[0:v]trim=start=0.00:end=4.50,setpts=PTS-STARTPTS,split=2[sin0a][sin0b]'));
   assert.ok(crop.includes('crop=ih*4/5:ih:(iw-ih*4/5)/2:0,scale=720:900'));
   assert.ok(crop.includes('boxblur=16:3[bg0]'));
-  assert.ok(crop.includes('[bg0][fg0]overlay=(W-w)/2:(H-h)/2[v0]'));
+  assert.ok(crop.includes('[bg0][fg0]overlay=(W-w)/2:(H-h)/2,setsar=1[v0]'));
   const box = buildDoacSceneChain(1, 4.5, 21.94, 'letterbox169', 720, 1280);
   assert.ok(box.includes('trim=start=4.50:end=21.94'));
   assert.ok(box.includes('scale=720:405:force_original_aspect_ratio=increase,crop=720:405'));
   assert.ok(!box.includes('crop=ih*4/5'));
-  assert.ok(box.includes('[bg1][fg1]overlay=(W-w)/2:(H-h)/2[v1]'));
+  // v8.4: setsar=1 on every concat input — the hook punch-in scale and the
+  // plain scale produce different SARs on 720p sources, and concat
+  // rejects mismatched SARs with ffmpeg -22 ("no packets").
+  assert.ok(box.includes('[bg1][fg1]overlay=(W-w)/2:(H-h)/2,setsar=1[v1]'));
 });
 
 test('v8 generateDoacSubtitle: Archivo Black, below-picture, highlight only, no extras', () => {

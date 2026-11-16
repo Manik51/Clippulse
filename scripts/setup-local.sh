@@ -67,6 +67,34 @@ else
   echo "[OK] YuNet model found: $YUNET_MODEL"
 fi
 
+# 5. Download the caption fonts (OFL, free) the 7 subtitle styles need:
+#    Anton (Hormozi) + Archivo Black (DOAC) + Bebas Neue (Word Flash) +
+#    Montserrat ExtraBold (Minimal). Noto Sans (Sentence) is a system font
+#    on most Linux desktops. Without these, libass silently falls back to
+#    DejaVu Sans and the styles stop looking distinct.
+mkdir -p ~/.fonts
+if [ ! -f ~/.fonts/Anton-Regular.ttf ]; then
+  echo "==> Downloading Anton font..."
+  curl -fsSL -o ~/.fonts/Anton-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf" \
+    || echo "[WARN] Could not download Anton — Hormozi captions fall back to a system font."
+fi
+if [ ! -f ~/.fonts/ArchivoBlack-Regular.ttf ]; then
+  echo "==> Downloading Archivo Black font..."
+  curl -fsSL -o ~/.fonts/ArchivoBlack-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/archivoblack/ArchivoBlack-Regular.ttf" \
+    || echo "[WARN] Could not download Archivo Black — DOAC captions fall back to a system font."
+fi
+if [ ! -f ~/.fonts/BebasNeue-Regular.ttf ]; then
+  echo "==> Downloading Bebas Neue font..."
+  curl -fsSL -o ~/.fonts/BebasNeue-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf" \
+    || echo "[WARN] Could not download Bebas Neue — Word Flash falls back to a system font."
+fi
+if [ ! -f ~/.fonts/Montserrat-ExtraBold.ttf ]; then
+  echo "==> Downloading Montserrat ExtraBold font..."
+  curl -fsSL -o ~/.fonts/Montserrat-ExtraBold.ttf "https://github.com/JulietaUla/Montserrat/raw/master/fonts/ttf/Montserrat-ExtraBold.ttf" \
+    || echo "[WARN] Could not download Montserrat ExtraBold — Minimal falls back to a system font."
+fi
+if command -v fc-cache >/dev/null 2>&1; then fc-cache -f ~/.fonts >/dev/null 2>&1 || true; fi
+
 # Optional Python tools for full offline Whisper / MediaPipe pipeline
 if command -v pip3 >/dev/null 2>&1; then
   echo "==> Installing optional Python pipeline packages (youtube-transcript-api, vaderSentiment)..."

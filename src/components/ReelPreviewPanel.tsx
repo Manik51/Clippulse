@@ -315,7 +315,7 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
           {/* Synchronized Karaoke .ASS Caption Preview */}
           <div
             data-testid="karaoke-caption-line"
-            className="absolute bottom-14 inset-x-3 text-center pointer-events-none"
+            className={`absolute ${captionStyle === 'top' ? 'top-24' : 'bottom-14'} inset-x-3 text-center pointer-events-none`}
           >
             <div
               className={`inline-flex flex-wrap justify-center gap-x-1.5 gap-y-0.5 px-2.5 py-1.5 rounded-lg ${
@@ -327,12 +327,22 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
                 const isSpoken = playbackTime > item.relEnd + 0.15;
 
                 let wordStyle = 'text-white/85';
-                if (captionStyle === 'karaoke') {
+                if (captionStyle === 'karaoke' || captionStyle === 'top') {
                   wordStyle = isActive
                     ? 'text-amber-300 scale-105'
                     : isSpoken
                       ? 'text-white'
                       : 'text-white/70';
+                } else if (captionStyle === 'lime') {
+                  wordStyle = isActive
+                    ? 'text-lime-300 scale-105'
+                    : isSpoken
+                      ? 'text-white'
+                      : 'text-white/70';
+                } else if (captionStyle === 'flash') {
+                  wordStyle = isActive ? 'text-amber-300 scale-110' : 'text-white/70';
+                } else if (captionStyle === 'sentence') {
+                  wordStyle = 'text-white';
                 } else if (captionStyle === 'bold') {
                   wordStyle = isActive ? 'text-white bg-rose-600 px-1 rounded' : 'text-white';
                 } else {
@@ -343,9 +353,13 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
                   <span
                     key={`${item.word}-${idx}`}
                     className={`font-display transition-transform duration-100 ${
-                      captionStyle === 'minimal'
-                        ? 'text-sm font-medium'
-                        : 'text-base font-extrabold uppercase tracking-tight drop-shadow'
+                      captionStyle === 'flash'
+                        ? 'text-3xl font-black uppercase tracking-tight drop-shadow'
+                        : captionStyle === 'sentence'
+                          ? 'text-base font-bold tracking-tight drop-shadow'
+                          : captionStyle === 'minimal'
+                            ? 'text-sm font-medium'
+                            : 'text-base font-extrabold uppercase tracking-tight drop-shadow'
                     } ${wordStyle}`}
                   >
                     {item.word}
@@ -449,7 +463,7 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
             {lang === 'bn' ? 'ক্যাপশন স্টাইল' : 'Caption Style'}
           </span>
           <div role="group" aria-label="Caption style" className="inline-flex p-1 bg-slate-100 rounded-lg">
-            {(['karaoke', 'minimal', 'bold'] as CaptionStyle[]).map((style) => (
+            {(['karaoke', 'minimal', 'bold', 'lime', 'sentence', 'top', 'flash'] as CaptionStyle[]).map((style) => (
               <button
                 key={style}
                 type="button"

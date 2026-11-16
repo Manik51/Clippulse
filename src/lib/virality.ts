@@ -632,6 +632,44 @@ export function buildUploadedVideoSource(params: {
   };
 }
 
+export interface CaptionStylePreset {
+  font: string;
+  fontSize: number;
+  /** ASS colour &HAABBGGRR of the active word. */
+  primaryColour: string;
+  outlineColour: string;
+  outlineW: number;
+  shadowW: number;
+  /** ASS alignment: 2 bottom-centre, 8 top-centre, 5 middle-centre. */
+  alignment: number;
+  marginV: number;
+  /** 1 outline, 3 opaque box. */
+  borderStyle: number;
+  backColour: string;
+  uppercase: boolean;
+  pop: boolean;
+  popScale: number;
+  mode: 'karaoke' | 'sentence' | 'flash';
+}
+
+/**
+ * ClipPulse v8.3 — seven caption designs for the repo showcase. Every font
+ * here must actually exist on the machine: Anton + Archivo Black ship in
+ * ~/.fonts, Bebas Neue + Montserrat ExtraBold are installed by
+ * scripts/setup-local.sh, Noto Sans is a system font. (The old 'minimal'
+ * named DM Sans and 'bold' named Plus Jakarta Sans — neither was ever
+ * installed, so libass silently rendered both in DejaVu Sans.)
+ */
+export const CAPTION_STYLE_PRESETS: Record<CaptionStyle, CaptionStylePreset> = {
+  karaoke: { font: 'Anton', fontSize: 72, primaryColour: '&H0000D7FF', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, pop: true, popScale: 118, mode: 'karaoke' },
+  minimal: { font: 'Montserrat ExtraBold', fontSize: 54, primaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 3, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, pop: false, popScale: 118, mode: 'karaoke' },
+  bold: { font: 'Plus Jakarta Sans', fontSize: 68, primaryColour: '&H003E1DE1', outlineColour: '&H000F172A', outlineW: 4, shadowW: 2, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, pop: false, popScale: 118, mode: 'karaoke' },
+  lime: { font: 'Anton', fontSize: 72, primaryColour: '&H0035F1C6', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, pop: true, popScale: 130, mode: 'karaoke' },
+  sentence: { font: 'Noto Sans', fontSize: 46, primaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 2, shadowW: 0, alignment: 2, marginV: 260, borderStyle: 3, backColour: '&HCC000000', uppercase: false, pop: false, popScale: 118, mode: 'sentence' },
+  top: { font: 'Anton', fontSize: 72, primaryColour: '&H0000D7FF', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 8, marginV: 150, borderStyle: 1, backColour: '&H80000000', uppercase: true, pop: true, popScale: 118, mode: 'karaoke' },
+  flash: { font: 'Bebas Neue', fontSize: 120, primaryColour: '&H0000D7FF', outlineColour: '&H00000000', outlineW: 6, shadowW: 0, alignment: 5, marginV: 0, borderStyle: 1, backColour: '&H80000000', uppercase: true, pop: true, popScale: 125, mode: 'flash' },
+};
+
 export function generateAssSubtitle(
   segments: TranscriptSegment[],
   startSec: number,
@@ -640,7 +678,7 @@ export function generateAssSubtitle(
   style: CaptionStyle = 'karaoke',
   attributionCredit?: string,
   includeProgressBar = true,
-  popScale = 118,
+  popScale?: number,
 ): string {
   const sortedWords = extractWordsFromSegments(segments)
     .filter((w) => w.start >= startSec && w.start < endSec)
@@ -658,17 +696,9 @@ export function generateAssSubtitle(
   const clipDuration = Math.max(1, endSec - startSec);
   const clipDurationMs = Math.round(clipDuration * 1000);
 
-  const primaryColour = style === 'karaoke' ? '&H0000D7FF' : style === 'bold' ? '&H003E1DE1' : '&H00FFFFFF';
+  const preset = CAPTION_STYLE_PRESETS[style];
+  const effectivePopScale = popScale ?? preset.popScale;
   const secondaryColour = '&H00FFFFFF';
-  // Hormozi karaoke: Anton (condensed extra-bold, OFL free, installed in
-  // ~/.fonts — "Plus Jakarta Sans" was never on this VM, libass was
-  // silently falling back to DejaVu Sans, which is why the old subs never
-  // looked Hormozi), 72pt, pure-black 5px outline, no soft shadow.
-  const karaokeFont = style === 'karaoke' ? 'Anton' : style === 'minimal' ? 'DM Sans' : 'Plus Jakarta Sans';
-  const fontSize = style === 'karaoke' ? 72 : style === 'minimal' ? 54 : 68;
-  const outlineColour = style === 'karaoke' ? '&H00000000' : '&H000F172A';
-  const outlineW = style === 'karaoke' ? 5 : 4;
-  const shadowW = style === 'karaoke' ? 0 : 2;
 
   const lines: string[] = [
     '[Script Info]',
@@ -680,7 +710,7 @@ export function generateAssSubtitle(
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Karaoke,${karaokeFont},${fontSize},${primaryColour},${secondaryColour},${outlineColour},&H80000000,-1,0,0,0,100,100,0,0,1,${outlineW},${shadowW},2,60,60,340,1`,
+    `Style: Karaoke,${preset.font},${preset.fontSize},${preset.primaryColour},${secondaryColour},${preset.outlineColour},${preset.backColour},-1,0,0,0,100,100,0,0,${preset.borderStyle},${preset.outlineW},${preset.shadowW},${preset.alignment},60,60,${preset.marginV},1`,
     'Style: HookBanner,Plus Jakarta Sans,74,&H00FFFFFF,&H00FFFFFF,&H000F172A,&HD01E1DE1,-1,0,0,0,100,100,0,0,3,18,0,8,70,70,220,1',
     'Style: CreditTag,DM Sans,32,&H80FFFFFF,&H80FFFFFF,&H00000000,&H60000000,0,0,0,0,100,100,0,0,1,2,0,2,40,40,90,1',
     'Style: ProgressBar,DM Sans,10,&H00481DE1,&H00481DE1,&H00481DE1,&H00481DE1,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1',
@@ -707,35 +737,66 @@ export function generateAssSubtitle(
     );
   }
 
-  const chunkSize = 4;
-  for (let i = 0; i < allWords.length; i += chunkSize) {
-    const chunk = allWords.slice(i, i + chunkSize);
-    if (chunk.length === 0) continue;
-    const chunkStart = Math.max(0, chunk[0].start - startSec);
-    const chunkEnd = Math.max(chunkStart + 0.35, chunk[chunk.length - 1].end - startSec);
+  // Word pop: scale to effectivePopScale% in its first ~90ms, then settle
+  // back to 100% — backslash-t times are in ms relative to the event.
+  // (The old subs only changed colour, never moved — that is why they did
+  // not read as Hormozi style.) BS is one backslash: ASS tags are built
+  // from it so this block carries no backslash literals.
+  const BS = String.fromCharCode(92);
+  const popTag = (wStartMs: number, wEndMs: number, durCs: number): string => {
+    const popMs = Math.min(90, Math.max(40, Math.round((wEndMs - wStartMs) * 0.4)));
+    const settleMs = Math.min(wEndMs, wStartMs + 260);
+    return `{${BS}kf${durCs}${BS}t(${wStartMs},${wStartMs + popMs},${BS}fscx${effectivePopScale}${BS}fscy${effectivePopScale})${BS}t(${wStartMs + popMs},${settleMs},${BS}fscx100${BS}fscy100)}`;
+  };
 
-    const karaokeText = chunk
-      .map((w) => {
-        const durCs = Math.max(12, Math.round((w.end - w.start) * 100));
-        // Hormozi: ALL CAPS, word by word. The pop is a scale transform
-        // on the active word — `popScale`% in its first ~90ms, then
-        // settling back to 100% — with \t times in ms relative to the
-        // event. (The old subs only changed colour, never moved — that
-        // is why they did not read as Hormozi style.) v8: popScale is a
-        // parameter (118 default, 130 for the punchy variant).
-        const text = style === 'karaoke' ? w.word.toUpperCase() : w.word;
-        if (style !== 'karaoke') return `{\\kf${durCs}}${text}`;
-        const wStartMs = Math.max(0, Math.round((w.start - startSec - chunkStart) * 1000));
-        const wEndMs = Math.max(wStartMs + 120, Math.round((w.end - startSec - chunkStart) * 1000));
-        const popMs = Math.min(90, Math.max(40, Math.round((wEndMs - wStartMs) * 0.4)));
-        const settleMs = Math.min(wEndMs, wStartMs + 260);
-        return `{\\kf${durCs}\\t(${wStartMs},${wStartMs + popMs},\\fscx${popScale}\\fscy${popScale})\\t(${wStartMs + popMs},${settleMs},\\fscx100\\fscy100)}${text}`;
-      })
-      .join(' ');
+  if (preset.mode === 'sentence') {
+    // One full-sentence line per transcript segment — the classic
+    // documentary subtitle look. No karaoke sweep, no pop.
+    for (const seg of segments) {
+      const segStart = Math.max(startSec, seg.start);
+      const segEnd = Math.min(endSec, seg.end);
+      if (segEnd <= segStart) continue;
+      const text = seg.text.trim().replace(/\s+/g, ' ');
+      if (!text) continue;
+      lines.push(
+        `Dialogue: 0,${formatAssTimecode(segStart - startSec)},${formatAssTimecode(segEnd - startSec)},Karaoke,,0,0,0,,${text}`
+      );
+    }
+  } else if (preset.mode === 'flash') {
+    // One huge word at a time, centred — the word-flash Shorts look.
+    for (const w of allWords) {
+      const wStart = Math.max(0, w.start - startSec);
+      const wEnd = Math.max(wStart + 0.35, w.end - startSec);
+      const durCs = Math.max(12, Math.round((w.end - w.start) * 100));
+      const text = preset.uppercase ? w.word.toUpperCase() : w.word;
+      const wEndMs = Math.max(120, Math.round((wEnd - wStart) * 1000));
+      lines.push(
+        `Dialogue: 0,${formatAssTimecode(wStart)},${formatAssTimecode(wEnd)},Karaoke,,0,0,0,,${popTag(0, wEndMs, durCs)}${text}`
+      );
+    }
+  } else {
+    const chunkSize = 4;
+    for (let i = 0; i < allWords.length; i += chunkSize) {
+      const chunk = allWords.slice(i, i + chunkSize);
+      if (chunk.length === 0) continue;
+      const chunkStart = Math.max(0, chunk[0].start - startSec);
+      const chunkEnd = Math.max(chunkStart + 0.35, chunk[chunk.length - 1].end - startSec);
 
-    lines.push(
-      `Dialogue: 0,${formatAssTimecode(chunkStart)},${formatAssTimecode(chunkEnd)},Karaoke,,0,0,0,,${karaokeText}`
-    );
+      const karaokeText = chunk
+        .map((w) => {
+          const durCs = Math.max(12, Math.round((w.end - w.start) * 100));
+          const text = preset.uppercase ? w.word.toUpperCase() : w.word;
+          if (!preset.pop) return `{${BS}kf${durCs}}${text}`;
+          const wStartMs = Math.max(0, Math.round((w.start - startSec - chunkStart) * 1000));
+          const wEndMs = Math.max(wStartMs + 120, Math.round((w.end - startSec - chunkStart) * 1000));
+          return `${popTag(wStartMs, wEndMs, durCs)}${text}`;
+        })
+        .join(' ');
+
+      lines.push(
+        `Dialogue: 0,${formatAssTimecode(chunkStart)},${formatAssTimecode(chunkEnd)},Karaoke,,0,0,0,,${karaokeText}`
+      );
+    }
   }
 
   return lines.join('\n');
@@ -877,7 +938,7 @@ export function buildDoacSceneChain(
     `[0:v]trim=start=${s}:end=${e},setpts=PTS-STARTPTS,split=2[sin${index}a][sin${index}b];` +
     `[sin${index}a]scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},boxblur=16:3[bg${index}];` +
     `[sin${index}b]${fg}[fg${index}];` +
-    `[bg${index}][fg${index}]overlay=(W-w)/2:(H-h)/2[v${index}]`
+    `[bg${index}][fg${index}]overlay=(W-w)/2:(H-h)/2,setsar=1[v${index}]`
   );
 }
 

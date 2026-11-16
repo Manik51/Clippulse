@@ -305,3 +305,33 @@ Manik ordered a full tool + security audit first, then a public repo push to his
 - `LICENSE`: MIT, Manik Shil 2026.
 - `scripts/setup-local.sh`: now downloads the YuNet face model (`face_detection_yunet_2023mar.onnx`, 232KB) from the official OpenCV model zoo when missing (URL verified 302 → live), so the repo needs no binary model file.
 - Push plan: GitHub MCP is connected as Manik51. `push_files` is UTF-8-text only (max 16 MiB / 2,000 files, no binaries) — the text snapshot (code + README + SVG logo + docs) goes via the MCP; binaries (logo PNG, sample mp4, GIFs) go via the GitHub web upload afterwards (Manik signs in himself per his sign-in rule). Repo dressing (logo, README, GIFs, examples/) delegated to a subagent; push only after its output is reviewed file by file.
+
+## v8.4 — Seven caption styles + showcase + four render bugs fixed (2026-11-16)
+
+Manik ordered 5–7 more showcase videos, each with a different subtitle design, plus screenshots of the tool and visuals of how to use it — and then, in the same chat, that every clip also exist as an auto-playing looping GIF so a repo visitor sees the motion without pressing play. (A background memory note briefly misread his 21:43 IST "baad dao" in the main chat as cancelling the GIFs — the main-chat transcript proves it was about BUYING SUBSCRIBERS: he asked if bought subs would monetize, was told no, and said drop that idea. The GIF order stands.)
+
+### Seven caption styles (`CAPTION_STYLE_PRESETS`, virality.ts)
+- `doac` — the locked production standard (separate `generateDoacSubtitle`).
+- `karaoke` — Hormozi (Anton 72pt, yellow, pop 118). `lime` — same but lime `#C6F135` highlight, pop 130.
+- `minimal` — Montserrat ExtraBold 54pt, small white, no pop. (Fixed a real defect: the old preset named DM Sans, which was never installed — libass silently rendered it in DejaVu Sans. `bold` still names Plus Jakarta Sans, also never installed; left as-is for backward compatibility.)
+- `sentence` — Noto Sans 46pt, one full sentence at a time on a semi-transparent black box (BorderStyle 3).
+- `top` — Anton 72pt yellow karaoke pinned to the top of the frame.
+- `flash` — Bebas Neue 120pt, one huge word at a time, centre frame, pop 125.
+- Fonts: Anton + Archivo Black + Bebas Neue + Montserrat ExtraBold are OFL free; `scripts/setup-local.sh` now downloads all four into `~/.fonts` when missing (URLs verified live). The workbench UI picker (`ReelPreviewPanel.tsx`) offers all seven styles and its in-page preview mirrors each one's colours/position.
+- Tests 35/35 (1 new v8.3 style test), lint + build clean.
+
+### Showcase (local only until the push)
+- `examples/styles/<style>/` — 7 clips, 720p ~30s each, every one verified by viewing frames at 0/5/15/25s + a 0.25s RMS audio profile (voice present, 0 bursts): doac (Raj 800–830s, reused approved sample), karaoke (Raj 85–115s, reused Hormozi v7), minimal (Boxing 225–255s), lime (Apex 2290–2320s), sentence (MrBeast 1200–1230s), top (Raj 1440–1470s), flash (Raj 85–115s — same moment as karaoke, so the style difference is easy to compare). Each folder holds `clip.mp4` + `clip.gif` (480px, 10 fps, 6–7s looping excerpt from the start) + `thumb.jpg` (frame ~5s).
+- `assets/screenshots/` — real UI shots: `ui-trending.png` (10 creator cards), `ui-video.png` (trending videos + Make 4 clips), `ui-clips.png` (real clips view — honest caveat: Groq 429s forced an audio-energy-only fallback that picked 2 windows, not 4; the README says so). `assets/how-to-use.png` — 4-step visual guide built from the real screenshots.
+- README gained a "Caption styles" gallery (GIFs embedded, they autoplay; full mp4 linked under each) and a "Screenshots / How to use" section.
+
+### Four bugs found by the showcase audit — all fixed in this pass
+1. **`-af` + `-filter_complex` collision (ffmpeg 234):** the `sports-blur` and `gaming-split` branches polish audio inside `-filter_complex` (`[aout]`) but never set the flag the `-af` guard reads — the guard added `-af` too and ffmpeg rejected the combination. Fix: both branches now set `usedScenes = true` (the flag's real meaning is "a filter_complex branch already handled audio"; the guard comment was corrected too).
+2. **Concat SAR mismatch → ffmpeg −22 "no packets":** the scene-aware face-track chains end in `concat`, but scene 0's hook punch-in scale (`eval=frame`, fractional w/h) produces a different SAR than the other scenes' plain scale — `concat` rejects mismatched SARs. It hit EVERY 720p-source face-track render (Boxing, MrBeast, Apex all failed this way); 1080p Raj sources happened to reduce to matching SARs, which is why they worked. Fix: `setsar=1` on every per-scene video chain (server.ts face-track branch) and on the DOAC per-scene overlay output (`buildDoacSceneChain`). Proven with a local repro of the server's own filter graph: without `setsar=1` → −22, with it → exit 0.
+3. **`top` preset `marginV: 560 → 150`:** captions landed ~29% down the frame, across faces.
+4. **`sentence` preset `Outline: 0 → 2`:** libass draws NO box with BorderStyle=3 + Outline=0 (proven with a minimal ASS test).
+- The showcase clips themselves were rendered with workarounds before these fixes, so they are already correct; the fixes make the SERVER path produce them directly. Regression renders via the API (Boxing minimal, MrBeast sentence, Raj top) verify the fixes live — results recorded below.
+- **Regression proof (all 3 pass, live server API only, 2026-11-16 ~23:05 IST):** (1) Boxing 225–255s `minimal`, job e9e1869a — sports-blur, single `-filter_complex` with the voice-polish leg inside and NO separate `-af`; small white Montserrat captions bottom-centre, RMS median −17.9 dB, 0 bursts. (2) MrBeast 1200–1230s `sentence`, job effe9a81 — face-track, scene-aware, concat completed; white text on a clearly visible opaque black box; RMS median −18.8 dB, 0 bursts. (3) Raj 1440–1470s `top`, job 037aed19 — face-track, 2 scenes; captions at the top (~150px zone), clear of faces on every viewed frame, yellow karaoke highlight on the active words; RMS median −17.3 dB, 0 bursts. Proof mp4s in `/tmp/regression-v84/` (tmpfs — gone on restart); driver `regression-v84.ts` kept in the repo root as a scratch script, NOT pushed. One non-bug noted: the regression script's hook picker sliced a hook mid-word ("…LOOK AS THOUGH RO") — the server rendered exactly what it was given; the showcase clips used hand-picked hooks and are unaffected.
+
+### VM restart mid-job
+- The VM restarted at ~22:23 IST, wiping `/tmp` (the showcase scripts, the push manifest, the render logs). All workspace files survived. The server was restarted and is live; the manifest must be regenerated before the push.

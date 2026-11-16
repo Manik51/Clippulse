@@ -37,6 +37,24 @@ Every clip follows the same production standard:
 
 One honest line: ClipPulse finds the strongest moments it can *measure*. It cannot guarantee views — no tool can.
 
+## Caption styles
+
+The same clip, seven ways. Each preview below is a looping GIF from the
+full 30-second clip — it plays by itself, no need to press play. The full
+clip is linked under it. All seven were rendered from real YouTube
+moments and verified frame by frame; the full index is in
+[examples/styles/README.md](examples/styles/README.md).
+
+| Style | Preview (plays by itself) | Full clip |
+|---|---|---|
+| **DOAC** — the locked production standard: 4:5 crop with blur-fill bars, yellow hook title, captions below the picture | <img src="examples/styles/doac/clip.gif" width="135" alt="DOAC style preview — looping clip"> | [doac/clip.mp4](examples/styles/doac/clip.mp4) |
+| **Karaoke** — Hormozi style: Anton 72pt, yellow current word, ALL CAPS, word pop | <img src="examples/styles/karaoke/clip.gif" width="135" alt="Karaoke style preview — looping clip"> | [karaoke/clip.mp4](examples/styles/karaoke/clip.mp4) |
+| **Minimal** — Montserrat ExtraBold 54pt, small white sentence-case captions, no pop | <img src="examples/styles/minimal/clip.gif" width="135" alt="Minimal style preview — looping clip"> | [minimal/clip.mp4](examples/styles/minimal/clip.mp4) |
+| **Lime** — Anton 72pt with a lime `#C6F135` highlight on the current words | <img src="examples/styles/lime/clip.gif" width="135" alt="Lime style preview — looping clip"> | [lime/clip.mp4](examples/styles/lime/clip.mp4) |
+| **Sentence** — Noto Sans 46pt, one full sentence at a time on a semi-transparent black box | <img src="examples/styles/sentence/clip.gif" width="135" alt="Sentence style preview — looping clip"> | [sentence/clip.mp4](examples/styles/sentence/clip.mp4) |
+| **Top** — Anton 72pt, yellow karaoke captions pinned to the top of the frame | <img src="examples/styles/top/clip.gif" width="135" alt="Top style preview — looping clip"> | [top/clip.mp4](examples/styles/top/clip.mp4) |
+| **Flash** — Bebas Neue 120pt, one huge word at a time, centre frame | <img src="examples/styles/flash/clip.gif" width="135" alt="Flash style preview — looping clip"> | [flash/clip.mp4](examples/styles/flash/clip.mp4) |
+
 ## How it works
 
 ![How ClipPulse works: paste a link or fetch trends → smart analyze → 4 clips scored → DOAC render and download](assets/flow.svg)
@@ -45,6 +63,18 @@ One honest line: ClipPulse finds the strongest moments it can *measure*. It cann
 2. **Smart analyze** — the full video is transcribed with real Whisper speech-to-text, and a real audio-energy profile is measured. A sliding window scores every 30-second moment on hook strength, payoff, emotion and audio peaks.
 3. **4 clips, scored** — the top 4 non-overlapping moments, each with a suggested title and hook. Preview each one in the page.
 4. **Render & download** — local MP4 via ffmpeg in 720p, 1080p or 4K, with the DOAC edit style and burned-in captions.
+
+## Screenshots
+
+The real app, running at `http://localhost:3000`.
+
+![Trending tab — channel cards with followers, after Fetch Trends](assets/screenshots/ui-trending.png)
+
+![A creator's trending videos, with Make 4 clips on each](assets/screenshots/ui-video.png)
+
+![The clips view — scored clips ready in the page, each with a preview and a Download MP4 button](assets/screenshots/ui-clips.png)
+
+![How to use ClipPulse — four steps](assets/how-to-use.png)
 
 ## Features
 
@@ -87,7 +117,7 @@ Keys live only in your local `.env` — never committed, never sent anywhere exc
 ### Tests
 
 ```bash
-npm test   # 34 tests, virality scoring + subtitle + layout logic
+npm test   # 35 tests, virality scoring + subtitle + layout logic
 npm run lint
 ```
 
@@ -118,8 +148,8 @@ clippulse/
 │   ├── lib/virality.ts     # Scoring, captions (DOAC + Hormozi), DOAC layout
 │   └── components/         # TrendingClipsPanel, ExportModal, TopBar
 ├── scripts/                # PySceneDetect, YuNet face detection, thumbnails
-├── assets/                 # Logo (SVG + PNG), flow diagram, demo GIF
-├── examples/               # The approved DOAC sample clip
+├── assets/                 # Logo (SVG + PNG), flow diagram, demo GIF, screenshots, how-to visual
+├── examples/               # The approved DOAC sample clip + 7 caption-style showcases
 ├── renders/                # Your rendered clips (git-ignored)
 └── PRODUCTION-READY.md     # Full build history, v1 → v8.3
 ```
