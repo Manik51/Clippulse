@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="ClipPulse logo">
+  <title>ClipPulse</title>
+  <desc>A heartbeat pulse line cuts through a vertical 9:16 clip frame and resolves into a play triangle.</desc>
+  <!-- 9:16 clip frame -->
+  <rect x="84" y="24" width="88" height="208" rx="16" fill="none" stroke="#23262B" stroke-width="12"/>
+  <!-- pulse line: flat, spike, flat — runs through the frame -->
+  <path d="M 24 128 H 92 L 112 78 L 136 178 L 152 110 H 172"
+        fill="none" stroke="#C6F135" stroke-width="14"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- play triangle the pulse resolves into -->
+  <polygon points="172,102 172,154 220,128" fill="#FFD800" stroke="#FFD800"
+           stroke-width="10" stroke-linejoin="round"/>
+</svg>

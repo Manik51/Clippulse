@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 190" width="980" height="190" role="img" aria-label="How ClipPulse works">
+  <title>How ClipPulse works</title>
+  <desc>Paste a link or fetch trends, smart-analyze the video, score four clips, render in DOAC style and download.</desc>
+  <style>
+    .step { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 17px; font-weight: 700; fill: #FFFFFF; }
+    .sub { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13px; fill: #9AA0A6; }
+    .num { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 800; fill: #C6F135; }
+  </style>
+
+  <!-- Step 1 -->
+  <rect x="7" y="35" width="215" height="120" rx="14" fill="#111318"/>
+  <text class="num" x="25" y="72">1</text>
+  <text class="step" x="25" y="104">Paste link</text>
+  <text class="sub" x="25" y="128">or fetch trending videos</text>
+
+  <!-- Arrow 1 -->
+  <line x1="228" y1="95" x2="246" y2="95" stroke="#C6F135" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="246,86 258,95 246,104" fill="#C6F135"/>
+
+  <!-- Step 2 -->
+  <rect x="257" y="35" width="215" height="120" rx="14" fill="#111318"/>
+  <text class="num" x="275" y="72">2</text>
+  <text class="step" x="275" y="104">Smart analyze</text>
+  <text class="sub" x="275" y="128">real transcript + audio energy</text>
+
+  <!-- Arrow 2 -->
+  <line x1="478" y1="95" x2="496" y2="95" stroke="#C6F135" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="496,86 508,95 496,104" fill="#C6F135"/>
+
+  <!-- Step 3 -->
+  <rect x="507" y="35" width="215" height="120" rx="14" fill="#111318"/>
+  <text class="num" x="525" y="72">3</text>
+  <text class="step" x="525" y="104">4 clips scored</text>
+  <text class="sub" x="525" y="128">best moments ranked</text>
+
+  <!-- Arrow 3 -->
+  <line x1="728" y1="95" x2="746" y2="95" stroke="#C6F135" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="746,86 758,95 746,104" fill="#C6F135"/>
+
+  <!-- Step 4 -->
+  <rect x="757" y="35" width="215" height="120" rx="14" fill="#111318"/>
+  <text class="num" x="775" y="72">4</text>
+  <text class="step" x="775" y="104">DOAC render</text>
+  <text class="sub" x="775" y="128">preview &amp; download MP4</text>
+</svg>
