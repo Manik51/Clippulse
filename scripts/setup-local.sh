@@ -96,12 +96,14 @@ fi
 if command -v fc-cache >/dev/null 2>&1; then fc-cache -f ~/.fonts >/dev/null 2>&1 || true; fi
 
 # Optional Python tools for full offline Whisper / MediaPipe pipeline
+# (--break-system-packages: Debian/Ubuntu's pip refuses --user installs
+# without it, PEP 668; the packages are optional, so failure is fine.)
 if command -v pip3 >/dev/null 2>&1; then
   echo "==> Installing optional Python pipeline packages (youtube-transcript-api, vaderSentiment)..."
-  pip3 install --user -q youtube-transcript-api vaderSentiment || true
+  pip3 install --user --break-system-packages -q youtube-transcript-api vaderSentiment || true
 fi
 
 echo ""
 echo "Setup complete! Start ClipPulse locally with:"
-echo "  npm run dev"
+echo "  npm run prod"
 echo "Then open http://localhost:3000"

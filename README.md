@@ -89,7 +89,16 @@ The real app, running at `http://localhost:3000`.
 
 ## Quickstart
 
-**Prerequisites:** Node.js 20+, `ffmpeg`, `yt-dlp`. The setup script installs the last two for you on Linux/macOS.
+**One command — install + start** (Mac, Linux, or Git Bash on Windows).
+Age sudhu [Node.js LTS](https://nodejs.org) ar [Git](https://git-scm.com) install kore nao:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Manik51/Clippulse/main/scripts/install.sh | bash
+```
+
+Eta repo download kore, setup chalaye (Node package, ffmpeg, yt-dlp, face model, font), ar server start kore dey. Tarpor kholo **http://localhost:3000**. Bondho korte terminal-e `Ctrl+C`.
+
+**Hate kore korte chaile** (eko-i jinish, 4 step-e):
 
 ```bash
 git clone https://github.com/Manik51/Clippulse.git
