@@ -658,42 +658,58 @@ export function buildUploadedVideoSource(params: {
   };
 }
 
+/** Per-word motion. Every style animates — a static style reads as a
+ * broken render next to the others. 'wordbox' is the bold style's motion:
+ * the highlight box follows the spoken word, one word per event.
+ * 'typewriter' is the sentence style's motion: the line reveals itself
+ * word by word through the \kf fill. */
+export type CaptionMotion = 'pop' | 'fade' | 'pulse' | 'flip' | 'bounce' | 'sweep' | 'wordbox' | 'typewriter';
+
 export interface CaptionStylePreset {
   font: string;
   fontSize: number;
   /** ASS colour &HAABBGGRR of the active word. */
   primaryColour: string;
+  /** ASS colour of not-yet-spoken words — the \kf sweep fills from this to primaryColour. */
+  secondaryColour: string;
   outlineColour: string;
   outlineW: number;
   shadowW: number;
-  /** ASS alignment: 2 bottom-centre, 8 top-centre, 5 middle-centre. */
+  /** ASS alignment: 1 bottom-left, 2 bottom-centre, 8 top-centre, 5 middle-centre. */
   alignment: number;
   marginV: number;
-  /** 1 outline, 3 opaque box. */
+  /** 1 outline, 3 opaque box. libass draws the box from OutlineColour,
+   * not BackColour — a coloured box needs the colour in both fields. */
   borderStyle: number;
   backColour: string;
   uppercase: boolean;
-  pop: boolean;
+  motion: CaptionMotion;
   popScale: number;
-  mode: 'karaoke' | 'sentence' | 'flash';
+  mode: 'karaoke' | 'sentence' | 'flash' | 'wordbox';
 }
 
 /**
- * ClipPulse v8.3 — seven caption designs for the repo showcase. Every font
- * here must actually exist on the machine: Anton + Archivo Black ship in
- * ~/.fonts, Bebas Neue + Montserrat ExtraBold are installed by
- * scripts/setup-local.sh, Noto Sans is a system font. (The old 'minimal'
- * named DM Sans and 'bold' named Plus Jakarta Sans — neither was ever
- * installed, so libass silently rendered both in DejaVu Sans.)
+ * ClipPulse v8.7 — seven caption designs, each unmistakably different:
+ * its OWN font + its OWN highlight treatment + its OWN position/size +
+ * its OWN motion. The v8.4 set failed this test — karaoke, lime, top and
+ * flash all read as big yellow/white bold caps. Every font here must
+ * actually exist on the machine: Anton + Archivo Black ship in ~/.fonts,
+ * Bebas Neue + Montserrat ExtraBold + Poppins ExtraBold + Alfa Slab One +
+ * Lilita One are installed by scripts/setup-local.sh, Noto Sans is a
+ * system font. (The old 'bold' named Plus Jakarta Sans — never installed,
+ * so libass silently rendered it in DejaVu Sans.)
+ * DO NOT change the doac generator below — it is the locked production
+ * standard. Karaoke keeps the Hormozi identity (Anton, yellow/white, pop);
+ * the other styles move away from it.
  */
 export const CAPTION_STYLE_PRESETS: Record<CaptionStyle, CaptionStylePreset> = {
-  karaoke: { font: 'Anton', fontSize: 72, primaryColour: '&H0000D7FF', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, pop: true, popScale: 118, mode: 'karaoke' },
-  minimal: { font: 'Montserrat ExtraBold', fontSize: 54, primaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 3, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, pop: false, popScale: 118, mode: 'karaoke' },
-  bold: { font: 'Plus Jakarta Sans', fontSize: 68, primaryColour: '&H003E1DE1', outlineColour: '&H000F172A', outlineW: 4, shadowW: 2, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, pop: false, popScale: 118, mode: 'karaoke' },
-  lime: { font: 'Anton', fontSize: 72, primaryColour: '&H0035F1C6', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, pop: true, popScale: 130, mode: 'karaoke' },
-  sentence: { font: 'Noto Sans', fontSize: 46, primaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 2, shadowW: 0, alignment: 2, marginV: 260, borderStyle: 3, backColour: '&HCC000000', uppercase: false, pop: false, popScale: 118, mode: 'sentence' },
-  top: { font: 'Anton', fontSize: 72, primaryColour: '&H0000D7FF', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 8, marginV: 150, borderStyle: 1, backColour: '&H80000000', uppercase: true, pop: true, popScale: 118, mode: 'karaoke' },
-  flash: { font: 'Bebas Neue', fontSize: 120, primaryColour: '&H0000D7FF', outlineColour: '&H00000000', outlineW: 6, shadowW: 0, alignment: 5, marginV: 0, borderStyle: 1, backColour: '&H80000000', uppercase: true, pop: true, popScale: 125, mode: 'flash' },
+  karaoke: { font: 'Anton', fontSize: 72, primaryColour: '&H0000D7FF', secondaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, motion: 'pop', popScale: 118, mode: 'karaoke' },
+  minimal: { font: 'Montserrat ExtraBold', fontSize: 40, primaryColour: '&H00FFFFFF', secondaryColour: '&H00BFBFBF', outlineColour: '&H00000000', outlineW: 1, shadowW: 0, alignment: 1, marginV: 200, borderStyle: 1, backColour: '&H80000000', uppercase: false, motion: 'fade', popScale: 118, mode: 'karaoke' },
+  bold: { font: 'Alfa Slab One', fontSize: 64, primaryColour: '&H00000000', secondaryColour: '&H00404040', outlineColour: '&H0000D7FF', outlineW: 6, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 3, backColour: '&H0000D7FF', uppercase: true, motion: 'wordbox', popScale: 115, mode: 'wordbox' },
+  lime: { font: 'Poppins ExtraBold', fontSize: 66, primaryColour: '&H0035F1C6', secondaryColour: '&H00FFFFFF', outlineColour: '&H0035F1C6', outlineW: 4, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, motion: 'pulse', popScale: 130, mode: 'karaoke' },
+  sentence: { font: 'Noto Sans', fontSize: 46, primaryColour: '&H00FFFFFF', secondaryColour: '&H00808080', outlineColour: '&H00000000', outlineW: 2, shadowW: 0, alignment: 2, marginV: 260, borderStyle: 3, backColour: '&HCC000000', uppercase: false, motion: 'typewriter', popScale: 118, mode: 'sentence' },
+  top: { font: 'Lilita One', fontSize: 56, primaryColour: '&H0000D7FF', secondaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 4, shadowW: 0, alignment: 8, marginV: 150, borderStyle: 1, backColour: '&H80000000', uppercase: true, motion: 'flip', popScale: 118, mode: 'karaoke' },
+  flash: { font: 'Bebas Neue', fontSize: 130, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H000000FF', outlineW: 6, shadowW: 0, alignment: 5, marginV: 0, borderStyle: 1, backColour: '&H80000000', uppercase: true, motion: 'bounce', popScale: 125, mode: 'flash' },
 };
 
 export function generateAssSubtitle(
@@ -724,7 +740,7 @@ export function generateAssSubtitle(
 
   const preset = CAPTION_STYLE_PRESETS[style];
   const effectivePopScale = popScale ?? preset.popScale;
-  const secondaryColour = '&H00FFFFFF';
+  const secondaryColour = preset.secondaryColour;
 
   const lines: string[] = [
     '[Script Info]',
@@ -775,21 +791,77 @@ export function generateAssSubtitle(
     return `{${BS}kf${durCs}${BS}t(${wStartMs},${wStartMs + popMs},${BS}fscx${effectivePopScale}${BS}fscy${effectivePopScale})${BS}t(${wStartMs + popMs},${settleMs},${BS}fscx100${BS}fscy100)}`;
   };
 
+  // v8.7 — one motion per style, all real ASS \t transforms rendered by
+  // libass (verified by frame pairs, not a flag). Timings are ms relative
+  // to the event start, exactly like popTag's.
+  const motionTag = (motion: CaptionMotion, wStartMs: number, wEndMs: number, durCs: number): string => {
+    switch (motion) {
+      case 'pop':
+        return popTag(wStartMs, wEndMs, durCs);
+      case 'fade': {
+        // Invisible until spoken, then fades in over ~150ms.
+        const fadeEnd = wStartMs + 150;
+        return `{${BS}1a&HFF&${BS}t(${wStartMs},${fadeEnd},${BS}1a&H00&)${BS}kf${durCs}}`;
+      }
+      case 'pulse': {
+        // Neon glow that settles: heavy blur decaying to a soft halo.
+        return `{${BS}blur4${BS}t(${wStartMs},${wEndMs},${BS}blur1)${BS}kf${durCs}}`;
+      }
+      case 'flip': {
+        // Flips in around the horizontal axis, then the \kf fill sweeps.
+        return `{${BS}fry80${BS}t(${wStartMs},${wStartMs + 200},${BS}fry0)${BS}kf${durCs}}`;
+      }
+      case 'bounce': {
+        // Overshoots big, dips small, settles — the word bounces in.
+        return `{${BS}t(${wStartMs},${wStartMs + 90},${BS}fscx150${BS}fscy150)${BS}t(${wStartMs + 90},${wStartMs + 200},${BS}fscx90${BS}fscy90)${BS}t(${wStartMs + 200},${wStartMs + 320},${BS}fscx100${BS}fscy100)${BS}kf${durCs}}`;
+      }
+      case 'wordbox':
+      case 'typewriter':
+      case 'sweep':
+      default:
+        return `{${BS}kf${durCs}}`;
+    }
+  };
+
   if (preset.mode === 'sentence') {
     // One full-sentence line per transcript segment — the classic
-    // documentary subtitle look. No karaoke sweep, no pop.
+    // documentary subtitle look. v8.7 typewriter reveal: the line fills
+    // itself in word by word through the \kf sweep (unrevealed words sit
+    // in secondary grey until their turn).
     for (const seg of segments) {
       const segStart = Math.max(startSec, seg.start);
       const segEnd = Math.min(endSec, seg.end);
       if (segEnd <= segStart) continue;
-      const text = seg.text.trim().replace(/\s+/g, ' ');
-      if (!text) continue;
+      const segWords = allWords.filter((w) => w.start >= seg.start && w.start < seg.end);
+      const text = segWords.length > 0
+        ? segWords
+            .map((w) => {
+              const durCs = Math.max(12, Math.round((w.end - w.start) * 100));
+              const word = preset.uppercase ? w.word.toUpperCase() : w.word;
+              return `{${BS}kf${durCs}}${word}`;
+            })
+            .join(' ')
+        : seg.text.trim().replace(/\s+/g, ' ');
+      if (!text.trim()) continue;
       lines.push(
         `Dialogue: 0,${formatAssTimecode(segStart - startSec)},${formatAssTimecode(segEnd - startSec)},Karaoke,,0,0,0,,${text}`
       );
     }
   } else if (preset.mode === 'flash') {
     // One huge word at a time, centred — the word-flash Shorts look.
+    for (const w of allWords) {
+      const wStart = Math.max(0, w.start - startSec);
+      const wEnd = Math.max(wStart + 0.35, w.end - startSec);
+      const durCs = Math.max(12, Math.round((w.end - w.start) * 100));
+      const text = preset.uppercase ? w.word.toUpperCase() : w.word;
+      const wEndMs = Math.max(120, Math.round((wEnd - wStart) * 1000));
+      lines.push(
+        `Dialogue: 0,${formatAssTimecode(wStart)},${formatAssTimecode(wEnd)},Karaoke,,0,0,0,,${motionTag(preset.motion, 0, wEndMs, durCs)}${text}`
+      );
+    }
+  } else if (preset.mode === 'wordbox') {
+    // One word at a time, each on its own solid box — the highlight box
+    // follows the spoken word. Small pop-in + \kf fill inside the box.
     for (const w of allWords) {
       const wStart = Math.max(0, w.start - startSec);
       const wEnd = Math.max(wStart + 0.35, w.end - startSec);
@@ -812,10 +884,9 @@ export function generateAssSubtitle(
         .map((w) => {
           const durCs = Math.max(12, Math.round((w.end - w.start) * 100));
           const text = preset.uppercase ? w.word.toUpperCase() : w.word;
-          if (!preset.pop) return `{${BS}kf${durCs}}${text}`;
           const wStartMs = Math.max(0, Math.round((w.start - startSec - chunkStart) * 1000));
           const wEndMs = Math.max(wStartMs + 120, Math.round((w.end - startSec - chunkStart) * 1000));
-          return `${popTag(wStartMs, wEndMs, durCs)}${text}`;
+          return `${motionTag(preset.motion, wStartMs, wEndMs, durCs)}${text}`;
         })
         .join(' ');
 

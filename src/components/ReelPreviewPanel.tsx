@@ -315,19 +315,26 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
           {/* Synchronized Karaoke .ASS Caption Preview */}
           <div
             data-testid="karaoke-caption-line"
-            className={`absolute ${captionStyle === 'top' ? 'top-24' : 'bottom-14'} inset-x-3 text-center pointer-events-none`}
+            className={`absolute ${captionStyle === 'top' ? 'top-24' : 'bottom-14'} ${captionStyle === 'minimal' ? 'left-3 text-left' : 'inset-x-3 text-center'} pointer-events-none`}
           >
             <div
-              className={`inline-flex flex-wrap justify-center gap-x-1.5 gap-y-0.5 px-2.5 py-1.5 rounded-lg ${
-                captionStyle === 'minimal' ? 'bg-black/65' : 'bg-black/45'
+              className={`inline-flex flex-wrap ${captionStyle === 'minimal' ? 'justify-start' : 'justify-center'} gap-x-1.5 gap-y-0.5 ${
+                captionStyle === 'sentence' ? 'bg-black/70 px-2.5 py-1.5 rounded-lg' : ''
               }`}
             >
               {activePhrase.map((item, idx) => {
                 const isActive = playbackTime >= item.relStart && playbackTime <= item.relEnd + 0.15;
                 const isSpoken = playbackTime > item.relEnd + 0.15;
 
+                // v8.7: preview mirrors the real ASS look per style.
                 let wordStyle = 'text-white/85';
-                if (captionStyle === 'karaoke' || captionStyle === 'top') {
+                if (captionStyle === 'karaoke') {
+                  wordStyle = isActive
+                    ? 'text-amber-300 scale-105'
+                    : isSpoken
+                      ? 'text-white'
+                      : 'text-white/70';
+                } else if (captionStyle === 'top') {
                   wordStyle = isActive
                     ? 'text-amber-300 scale-105'
                     : isSpoken
@@ -335,18 +342,21 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
                       : 'text-white/70';
                 } else if (captionStyle === 'lime') {
                   wordStyle = isActive
-                    ? 'text-lime-300 scale-105'
+                    ? 'text-lime-300 scale-105 [text-shadow:0_0_14px_#a3e635]'
                     : isSpoken
                       ? 'text-white'
                       : 'text-white/70';
                 } else if (captionStyle === 'flash') {
-                  wordStyle = isActive ? 'text-amber-300 scale-110' : 'text-white/70';
+                  wordStyle = isActive
+                    ? 'text-white scale-110 [text-shadow:2px_2px_0_#dc2626,0_0_16px_rgba(220,38,38,0.7)]'
+                    : 'text-white/70';
                 } else if (captionStyle === 'sentence') {
-                  wordStyle = 'text-white';
+                  wordStyle = isActive || isSpoken ? 'text-white' : 'text-white/25';
                 } else if (captionStyle === 'bold') {
-                  wordStyle = isActive ? 'text-white bg-rose-600 px-1 rounded' : 'text-white';
+                  wordStyle = isActive ? 'text-black bg-yellow-400 px-1.5 rounded' : 'text-white/25';
                 } else {
-                  wordStyle = isActive ? 'text-white underline decoration-amber-300' : 'text-white/80';
+                  // minimal: fades in, so unspoken words are barely there.
+                  wordStyle = isActive ? 'text-white' : isSpoken ? 'text-white/80' : 'text-white/30';
                 }
 
                 return (

@@ -69,9 +69,11 @@ fi
 
 # 5. Download the caption fonts (OFL, free) the 7 subtitle styles need:
 #    Anton (Hormozi) + Archivo Black (DOAC) + Bebas Neue (Word Flash) +
-#    Montserrat ExtraBold (Minimal). Noto Sans (Sentence) is a system font
-#    on most Linux desktops. Without these, libass silently falls back to
-#    DejaVu Sans and the styles stop looking distinct.
+#    Montserrat ExtraBold (Minimal) + Poppins ExtraBold (Lime glow) +
+#    Alfa Slab One (Bold wordbox) + Lilita One (Top flip).
+#    Noto Sans (Sentence) is a system font on most Linux desktops.
+#    Without these, libass silently falls back to DejaVu Sans and the
+#    styles stop looking distinct.
 mkdir -p ~/.fonts
 if [ ! -f ~/.fonts/Anton-Regular.ttf ]; then
   echo "==> Downloading Anton font..."
@@ -92,6 +94,21 @@ if [ ! -f ~/.fonts/Montserrat-ExtraBold.ttf ]; then
   echo "==> Downloading Montserrat ExtraBold font..."
   curl -fsSL -o ~/.fonts/Montserrat-ExtraBold.ttf "https://github.com/JulietaUla/Montserrat/raw/master/fonts/ttf/Montserrat-ExtraBold.ttf" \
     || echo "[WARN] Could not download Montserrat ExtraBold — Minimal falls back to a system font."
+fi
+if [ ! -f ~/.fonts/Poppins-ExtraBold.ttf ]; then
+  echo "==> Downloading Poppins ExtraBold font..."
+  curl -fsSL -o ~/.fonts/Poppins-ExtraBold.ttf "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf" \
+    || echo "[WARN] Could not download Poppins ExtraBold — Lime glow falls back to a system font."
+fi
+if [ ! -f ~/.fonts/AlfaSlabOne-Regular.ttf ]; then
+  echo "==> Downloading Alfa Slab One font..."
+  curl -fsSL -o ~/.fonts/AlfaSlabOne-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/alfaslabone/AlfaSlabOne-Regular.ttf" \
+    || echo "[WARN] Could not download Alfa Slab One — Bold wordbox falls back to a system font."
+fi
+if [ ! -f ~/.fonts/LilitaOne-Regular.ttf ]; then
+  echo "==> Downloading Lilita One font..."
+  curl -fsSL -o ~/.fonts/LilitaOne-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/lilitaone/LilitaOne-Regular.ttf" \
+    || echo "[WARN] Could not download Lilita One — Top flip falls back to a system font."
 fi
 if command -v fc-cache >/dev/null 2>&1; then fc-cache -f ~/.fonts >/dev/null 2>&1 || true; fi
 

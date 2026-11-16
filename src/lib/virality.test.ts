@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CAPTION_STYLE_PRESETS,
   CATEGORY_WEIGHTS,
   DEFAULT_WEIGHTS,
   buildAutoFetchPack,
@@ -36,6 +37,7 @@ import {
   VOICE_POLISH_FILTER,
 } from './virality';
 import { PRESET_VIDEOS } from './presets';
+import type { CaptionStyle } from './types';
 
 test('calculateWeightedScore applies 0.4*hook + 0.3*emotion + 0.2*audio + 0.1*pacing accurately', () => {
   const score = calculateWeightedScore(
@@ -464,41 +466,77 @@ test('v8 generateAssSubtitle popScale parameter (118 default, 130 punchy)', () =
   assert.ok(!pop.includes('fscx118'));
 });
 
-test('v8.3 caption styles: seven distinct designs, real installed fonts', () => {
+test('v8.7 caption styles: seven distinct designs, real installed fonts, own motion each', () => {
   const segs = [{ start: 85, end: 88, text: 'Leader of Al-Qaeda.', words: [
     { word: 'Leader', start: 85, end: 85.4 },
     { word: 'of', start: 85.4, end: 85.6 },
     { word: 'Al-Qaeda.', start: 85.6, end: 86.1 },
   ] }] as any;
   const styleLine = (ass: string) => ass.split('\n').find((l) => l.startsWith('Style: Karaoke,'))!;
+  const wordEvents = (ass: string) => ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
   // Hormozi stays Anton yellow with pop.
   assert.ok(styleLine(generateAssSubtitle(segs, 85, 115, '', 'karaoke')).includes('Anton,72,'));
-  // Minimal is Montserrat ExtraBold white, no pop (was DM Sans -> DejaVu fallback).
+  // Minimal is Montserrat ExtraBold 40pt, bottom-LEFT, fades in (no scale pop).
   const minimal = generateAssSubtitle(segs, 85, 115, '', 'minimal');
-  assert.ok(styleLine(minimal).includes('Montserrat ExtraBold,54,'));
-  const minimalWordEvents = minimal.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
-  assert.ok(minimalWordEvents.length > 0);
-  assert.ok(minimalWordEvents.every((l) => !l.includes('fscx')));
-  // Lime Pop: Anton, lime highlight, stronger pop.
+  assert.ok(styleLine(minimal).includes('Montserrat ExtraBold,40,'));
+  assert.ok(styleLine(minimal).includes(',1,1,0,1,60,60,200,1'));
+  assert.ok(wordEvents(minimal).length > 0);
+  assert.ok(wordEvents(minimal).every((l) => !l.includes('fscx')));
+  assert.ok(wordEvents(minimal).every((l) => l.includes('\\1a&HFF&')));
+  // Bold is Alfa Slab One on a solid yellow box, one word per event.
+  // (libass draws the BorderStyle=3 box from the OUTLINE colour, not
+  // BackColour — outline must be yellow too, or the box comes out black.)
+  const bold = generateAssSubtitle(segs, 85, 115, '', 'bold');
+  assert.ok(styleLine(bold).includes('Alfa Slab One,64,'));
+  assert.ok(styleLine(bold).includes(',3,6,0,2,60,60,340,1'));
+  assert.ok(styleLine(bold).includes('&H00404040,&H0000D7FF,&H0000D7FF,'));
+  assert.equal(wordEvents(bold).length, 3);
+  // Lime: Poppins ExtraBold, lime highlight, glow pulse (blur decay, no scale pop).
   const lime = generateAssSubtitle(segs, 85, 115, '', 'lime');
+  assert.ok(styleLine(lime).includes('Poppins ExtraBold,66,'));
   assert.ok(styleLine(lime).includes('&H0035F1C6'));
-  assert.ok(lime.includes('fscx130'));
-  // Sentence: opaque-box style, one event per segment, full sentence text.
-  // (v8.4: Outline 2 — libass draws no box with BorderStyle=3 + Outline=0.)
+  assert.ok(wordEvents(lime).every((l) => l.includes('\\blur4')));
+  assert.ok(wordEvents(lime).every((l) => !l.includes('fscx')));
+  // Sentence: opaque-box style, one event per segment, typewriter \kf reveal.
   const sentence = generateAssSubtitle(segs, 85, 115, '', 'sentence');
   assert.ok(styleLine(sentence).includes('Noto Sans,46,'));
   assert.ok(styleLine(sentence).includes(',3,2,0,2,60,60,260,1'));
-  assert.ok(sentence.includes('Leader of Al-Qaeda.'));
-  // Top karaoke: top-centre alignment, close to the top edge (v8.4: 150,
-  // was 560 — captions landed ~29% down the frame, across faces).
+  assert.ok(sentence.includes('Leader'));
+  assert.ok(sentence.includes('Al-Qaeda.'));
+  assert.ok(sentence.includes('\\kf'));
+  // Top: Lilita One at the top, flips in (no scale pop).
   const top = generateAssSubtitle(segs, 85, 115, '', 'top');
-  assert.ok(styleLine(top).includes(',1,5,0,8,60,60,150,1'));
-  // Word Flash: Bebas Neue 120pt, middle-centre, one event per word.
+  assert.ok(styleLine(top).includes('Lilita One,56,'));
+  assert.ok(styleLine(top).includes(',1,4,0,8,60,60,150,1'));
+  assert.ok(wordEvents(top).every((l) => l.includes('\\fry80')));
+  assert.ok(wordEvents(top).every((l) => !l.includes('fscx')));
+  // Word Flash: Bebas Neue 130pt, middle-centre, white with a red outline, bounces in.
   const flash = generateAssSubtitle(segs, 85, 115, '', 'flash');
-  assert.ok(styleLine(flash).includes('Bebas Neue,120,'));
+  assert.ok(styleLine(flash).includes('Bebas Neue,130,'));
   assert.ok(styleLine(flash).includes(',1,6,0,5,60,60,0,1'));
-  const flashEvents = flash.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
-  assert.equal(flashEvents.length, 3);
+  assert.ok(styleLine(flash).includes('&H00FFFFFF'));
+  assert.ok(styleLine(flash).includes('&H000000FF'));
+  assert.ok(wordEvents(flash).every((l) => l.includes('fscx150')));
+  assert.equal(wordEvents(flash).length, 3);
+});
+
+test('v8.7 caption styles are mutually distinct: font, motion, position', () => {
+  const styles = Object.keys(CAPTION_STYLE_PRESETS) as CaptionStyle[];
+  assert.equal(styles.length, 7);
+  const fonts = styles.map((s) => CAPTION_STYLE_PRESETS[s].font);
+  assert.equal(new Set(fonts).size, 7);
+  const motions = styles.map((s) => CAPTION_STYLE_PRESETS[s].motion);
+  assert.equal(new Set(motions).size, 7);
+  // Positions: minimal bottom-left, top top-centre, flash middle-centre, rest bottom-centre.
+  assert.equal(CAPTION_STYLE_PRESETS.minimal.alignment, 1);
+  assert.equal(CAPTION_STYLE_PRESETS.top.alignment, 8);
+  assert.equal(CAPTION_STYLE_PRESETS.flash.alignment, 5);
+  // No two styles share the same (font, alignment, fontSize) triple.
+  const triples = styles.map((s) => {
+    const p = CAPTION_STYLE_PRESETS[s];
+    return `${p.font}|${p.alignment}|${p.fontSize}`;
+  });
+  assert.equal(new Set(triples).size, 7);
 });
 
 test('v8 buildDoacBlurFill is a 4:5 centre crop on a blurred 9:16 fill', () => {
