@@ -21,6 +21,7 @@ import {
   buildHookTitleDrawtext,
   decideDoacShotLayout,
   extractYoutubeVideoId,
+  normalizeClipLengthSec,
   qualityDims,
   CATEGORY_WEIGHTS,
   DEFAULT_WEIGHTS,
@@ -1060,7 +1061,9 @@ async function startServer() {
     res.setTimeout(30 * 60 * 1000);
     const youtubeUrl = typeof req.body?.youtubeUrl === 'string' ? req.body.youtubeUrl.trim() : '';
     const category = (typeof req.body?.category === 'string' ? req.body.category : 'podcast') as VideoCategory;
-    const windowSec = Math.max(15, Math.min(60, Number(req.body?.windowSec ?? 30)));
+    // v8.6 — clipLengthSec (30/45/60/custom, 10–180s, default 30).
+    // windowSec stays as a legacy alias for older clients.
+    const clipLengthSec = normalizeClipLengthSec(req.body?.clipLengthSec ?? req.body?.windowSec);
     if (!youtubeUrl) {
       res.status(400).json({ ok: false, error: 'YouTube URL is required.' });
       return;
@@ -1107,7 +1110,7 @@ async function startServer() {
       const parsedDur = Number.parseFloat(durOut.trim());
       const durationSec =
         Number.isFinite(parsedDur) && parsedDur > 0 ? Math.round(parsedDur) : meta?.durationSec || 0;
-      if (!durationSec || durationSec < windowSec) {
+      if (!durationSec || durationSec < clipLengthSec) {
         finishAsyncJob(jobId, { ok: false, error: 'Video is too short for a smart window analysis.' });
         return;
       }
@@ -1124,7 +1127,7 @@ async function startServer() {
       );
       source.audioEnergyProfile = audioProfile;
       source.durationSec = durationSec;
-      const windows = buildSlidingWindows(source, weights, windowSec, 5);
+      const windows = buildSlidingWindows(source, weights, clipLengthSec, 5);
       const sorted = [...windows].sort((a, b) => b.totalScore - a.totalScore);
       const top = sorted[0];
       finishAsyncJob(jobId, {
@@ -1133,7 +1136,8 @@ async function startServer() {
         title: meta?.title || 'YouTube Video',
         channel: meta?.channel || 'YouTube Creator',
         durationSec,
-        windowSec,
+        windowSec: clipLengthSec,
+        clipLengthSec,
         hasTranscript: transcript.length > 0,
         transcriptChars: transcript.length,
         topWindow: top
@@ -1731,8 +1735,16 @@ async function startServer() {
     }
 
     const safeStart = Math.max(0, Math.floor(startSec));
-    const safeEnd = Math.max(safeStart + 5, Math.floor(endSec));
-    const clipDuration = Math.min(60, Math.max(5, safeEnd - safeStart));
+    let safeEnd = Math.max(safeStart + 5, Math.floor(endSec));
+    // v8.6 — clipLengthSec (30/45/60/custom, 10–180s) overrides the
+    // endSec-derived length when the caller sends it; otherwise the
+    // startSec/endSec pair rules, exactly as before.
+    if (req.body?.clipLengthSec !== undefined && req.body?.clipLengthSec !== null && req.body?.clipLengthSec !== '') {
+      safeEnd = safeStart + normalizeClipLengthSec(req.body.clipLengthSec);
+    }
+    // v8.6 — was Math.min(60, ...): a custom 90s/180s clip was silently
+    // cut to 60s. The cap is now the same 10–180s range as analyze.
+    const clipDuration = Math.min(180, Math.max(5, safeEnd - safeStart));
     const cropRatio = Math.max(0.15, Math.min(0.85, faceOffsetX / 100));
     const hasValidAss = assContent.includes('[Events]');
 
@@ -1964,6 +1976,10 @@ async function startServer() {
           '-map',
           hasAudioStream ? '[aout]' : audioMap
         );
+        // v8.4: this branch already polished the audio inside
+        // -filter_complex — the -af guard below must not add a second
+        // audio filter (ffmpeg rejects -af beside -filter_complex).
+        usedScenes = true;
       } else if (framingUsed === 'gaming-split') {
         // v7: voice polish leg, same as sports-blur above.
         const gameAudio = hasAudioStream ? `;[0:a]${VOICE_POLISH_FILTER}[aout]` : '';
@@ -2000,6 +2016,9 @@ async function startServer() {
             gameAudioMap,
           );
         }
+        // v8.4: same as sports-blur above — audio already polished inside
+        // -filter_complex, so the -af guard below must stay off.
+        usedScenes = true;
       } else {
         // ClipPulse v3 — scene-aware face-track (OpenShorts per-scene
         // reframing): detect real cuts, check each scene's middle frame for
@@ -2180,7 +2199,7 @@ async function startServer() {
                     ? buildHookPunchScale(zoomW, zoomH, targetW, targetH)
                     : sceneZoomScale;
                 vChains.push(
-                  `[0:v]trim=start=${p.in.startSec}:end=${p.in.endSec},setpts=PTS-STARTPTS,crop=ih*9/16:ih:${cropX}:0,${zoomScale}[v${i}]`,
+                  `[0:v]trim=start=${p.in.startSec}:end=${p.in.endSec},setpts=PTS-STARTPTS,crop=ih*9/16:ih:${cropX}:0,${zoomScale},setsar=1[v${i}]`,
                 );
                 // apad: yt-dlp section downloads sometimes carry a short
                 // audio stream (9s in a 30s section); pad each segment with
@@ -2256,7 +2275,8 @@ async function startServer() {
       // v7: voice polish on the single-filter path too (was loudnorm-only
       // and copyright-safe-only). The pitch trick stays copyright-only.
       // v8: skip when a filter_complex branch already polished the audio
-      // (doac sets usedScenes) — -af beside -filter_complex is rejected.
+      // (doac, sports-blur and gaming-split all set usedScenes) — -af
+      // beside -filter_complex is rejected by ffmpeg.
       if (hasAudioStream && !sceneAware && !usedScenes) {
         const pitchTrick = copyrightSafeTransform
           ? 'aresample=44100,asetrate=44982,aresample=44100,atempo=1.01,'

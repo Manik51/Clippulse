@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Download, Flame, Play, RefreshCw, TrendingUp } from 'lucide-react';
-import { generateAssSubtitle, extractYoutubeVideoId } from '../lib/virality';
+import { generateAssSubtitle, extractYoutubeVideoId, CLIP_LENGTH_PRESETS, normalizeClipLengthSec } from '../lib/virality';
 import type { FramingMode, TranscriptSegment } from '../lib/types';
 
 /**
@@ -131,12 +131,30 @@ export const TrendingClipsPanel: React.FC = () => {
   const [clips, setClips] = useState<ClipJob[]>([]);
   const [quality, setQuality] = useState<Quality>('1080p');
   const [framing, setFraming] = useState<FramingChoice>('auto');
+  // v8.6 — clip length: 30s default; presets 30/45/60 or a custom 10–180s.
+  const [clipLengthSec, setClipLengthSec] = useState<number>(30);
+  const [customLength, setCustomLength] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [busy, setBusy] = useState<boolean>(false);
   const [note, setNote] = useState<string>('');
   const runIdRef = useRef<number>(0);
 
   const selectedChannel = channels.find((c) => c.handle === selectedHandle) || customChannel;
+
+  // v8.6 — custom length: a valid number updates the effective length
+  // (clamped 10–180s by the normaliser); an invalid value on blur resets
+  // to the 30s default instead of leaving a broken state.
+  const handleCustomLength = (text: string) => {
+    setCustomLength(text);
+    const n = Number(text);
+    if (Number.isFinite(n) && n > 0) setClipLengthSec(normalizeClipLengthSec(n));
+  };
+  const handleCustomLengthBlur = () => {
+    if (customLength !== '' && !(Number(customLength) > 0)) {
+      setCustomLength('');
+      setClipLengthSec(30);
+    }
+  };
 
   const fetchTrends = async () => {
     setError('');
@@ -191,6 +209,9 @@ export const TrendingClipsPanel: React.FC = () => {
           outputQuality: q,
           startSec: win.startSec,
           endSec: win.endSec,
+          // v8.6 — the window's own length, so the render matches the
+          // analyzed window even if the picker moved since.
+          clipLengthSec: Math.round(win.endSec - win.startSec),
           faceOffsetX: 50,
           framingMode: resolveFraming(channel),
           assContent,
@@ -258,7 +279,7 @@ export const TrendingClipsPanel: React.FC = () => {
         body: JSON.stringify({
           youtubeUrl: video.url,
           category: channel.handle.toLowerCase() === 'dream' ? 'gaming' : 'podcast',
-          windowSec: 30,
+          clipLengthSec,
         }),
       });
       const data = await res.json();
@@ -407,6 +428,45 @@ export const TrendingClipsPanel: React.FC = () => {
                 <option value="gaming-split">Gameplay split</option>
                 <option value="sports-blur">Sports blur</option>
               </select>
+            </label>
+            {/* v8.6 — clip length picker: presets 30/45/60s + custom 10–180s. */}
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+              Clip length
+              <span className="flex items-center gap-1">
+                {CLIP_LENGTH_PRESETS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setClipLengthSec(s);
+                      setCustomLength('');
+                    }}
+                    disabled={busy}
+                    aria-pressed={customLength === '' && clipLengthSec === s}
+                    className={`px-2 py-2 text-sm font-semibold rounded-lg border cursor-pointer ${
+                      customLength === '' && clipLengthSec === s
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {s}s
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={10}
+                  max={180}
+                  value={customLength}
+                  onChange={(e) => handleCustomLength(e.target.value)}
+                  onBlur={handleCustomLengthBlur}
+                  disabled={busy}
+                  placeholder="Custom"
+                  aria-label="Custom clip length in seconds (10 to 180)"
+                  title="Custom clip length in seconds (10–180)"
+                  className="w-20 px-2 py-2 text-sm font-semibold text-slate-900 bg-white border border-slate-300 rounded-lg"
+                />
+                <span className="font-normal text-slate-400">s</span>
+              </span>
             </label>
             <button
               type="button"

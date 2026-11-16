@@ -28,6 +28,7 @@ import {
   mergeSceneBoundaries,
   buildGameplayFilter,
   measureTitleWidthEm,
+  normalizeClipLengthSec,
   pickPunchTimes,
   qualityDims,
   parseCustomTranscriptToSource,
@@ -562,4 +563,51 @@ test('v8 generateDoacSubtitle: Archivo Black, below-picture, highlight only, no 
   assert.ok(!ass.includes('HookBanner'));
   const events = ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
   assert.ok(events.length > 0);
+});
+
+test('v8.6 normalizeClipLengthSec falls back to 30s for missing/invalid values', () => {
+  assert.equal(normalizeClipLengthSec(undefined), 30);
+  assert.equal(normalizeClipLengthSec(null), 30);
+  assert.equal(normalizeClipLengthSec(''), 30);
+  assert.equal(normalizeClipLengthSec('   '), 30);
+  assert.equal(normalizeClipLengthSec('abc'), 30);
+  assert.equal(normalizeClipLengthSec(Number.NaN), 30);
+  assert.equal(normalizeClipLengthSec(0), 30);
+  assert.equal(normalizeClipLengthSec(-45), 30);
+  assert.equal(normalizeClipLengthSec({}), 30);
+});
+
+test('v8.6 normalizeClipLengthSec clamps numeric values to 10–180s (does not reject them)', () => {
+  assert.equal(normalizeClipLengthSec(45), 45);
+  assert.equal(normalizeClipLengthSec(60), 60);
+  assert.equal(normalizeClipLengthSec('45'), 45);
+  assert.equal(normalizeClipLengthSec(44.6), 45);
+  // Below the floor clamps up to 10; above the ceiling clamps down to 180.
+  assert.equal(normalizeClipLengthSec(5), 10);
+  assert.equal(normalizeClipLengthSec(9), 10);
+  assert.equal(normalizeClipLengthSec(200), 180);
+  assert.equal(normalizeClipLengthSec(1000), 180);
+  assert.equal(normalizeClipLengthSec(10), 10);
+  assert.equal(normalizeClipLengthSec(180), 180);
+});
+
+test('v8.6 buildSlidingWindows with a 45s window produces 45s windows', () => {
+  const podcast = PRESET_VIDEOS.find((p) => p.id === 'podcast-founder')!;
+  const windows = buildSlidingWindows(podcast, DEFAULT_WEIGHTS, 45, 5);
+  // 120s source, 45s windows stepping 5s: starts 0..75 -> 16 windows.
+  assert.equal(windows.length, 16);
+  assert.ok(windows.every((w) => w.endSec - w.startSec === 45), 'every window is 45s long');
+  assert.equal(windows[0].startSec, 0);
+  assert.equal(windows[0].endSec, 45);
+  assert.equal(windows[windows.length - 1].startSec, 75);
+  assert.equal(windows[windows.length - 1].endSec, 120);
+});
+
+test('v8.6 buildSlidingWindows with a 60s window produces 60s windows', () => {
+  const podcast = PRESET_VIDEOS.find((p) => p.id === 'podcast-founder')!;
+  const windows = buildSlidingWindows(podcast, DEFAULT_WEIGHTS, 60, 5);
+  assert.equal(windows.length, 13);
+  assert.ok(windows.every((w) => w.endSec - w.startSec === 60), 'every window is 60s long');
+  assert.equal(windows[0].startSec, 0);
+  assert.equal(windows[0].endSec, 60);
 });

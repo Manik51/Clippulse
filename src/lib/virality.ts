@@ -337,6 +337,32 @@ export function evaluateCopyrightSafety(source: Pick<VideoSource, 'channel' | 't
   };
 }
 
+// ClipPulse v8.6 — clip length: the user asked for 30s / 45s / 60s / custom.
+// One normaliser owns the rule everywhere (server routes, UI picker, tests):
+//   - missing, non-numeric, zero or negative input -> 30s (the default)
+//   - a numeric value outside 10–180s is CLAMPED to that range, not
+//     rejected — so a stray 5 becomes 10 and 300 becomes 180.
+//   - whole seconds only (44.6 -> 45).
+export const CLIP_LENGTH_MIN_SEC = 10;
+export const CLIP_LENGTH_MAX_SEC = 180;
+export const CLIP_LENGTH_DEFAULT_SEC = 30;
+export const CLIP_LENGTH_PRESETS = [30, 45, 60] as const;
+
+export function normalizeClipLengthSec(value: unknown): number {
+  let n: number;
+  if (typeof value === 'number') {
+    n = value;
+  } else if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return CLIP_LENGTH_DEFAULT_SEC;
+    n = Number(trimmed);
+  } else {
+    return CLIP_LENGTH_DEFAULT_SEC;
+  }
+  if (!Number.isFinite(n) || n <= 0) return CLIP_LENGTH_DEFAULT_SEC;
+  return Math.min(CLIP_LENGTH_MAX_SEC, Math.max(CLIP_LENGTH_MIN_SEC, Math.round(n)));
+}
+
 export function buildSlidingWindows(
   source: VideoSource,
   weights: ScoringWeights = CATEGORY_WEIGHTS[source.category] || DEFAULT_WEIGHTS,
