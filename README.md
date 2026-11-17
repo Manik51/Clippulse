@@ -39,26 +39,36 @@ One honest line: ClipPulse finds the strongest moments it can *measure*. It cann
 
 ## Caption styles
 
-The same clip, seven ways. Each preview below is a looping GIF from the
-full 30-second clip — it plays by itself, no need to press play. The full
-clip is linked under it. All seven were rendered from real YouTube
-moments and verified frame by frame; the full index is in
-[examples/styles/README.md](examples/styles/README.md).
+Eighteen styles, eighteen different videos. Each preview below is a
+looping GIF from the full 30-second clip — it plays by itself, no need to
+press play. The full clip is linked under it. Every style was rendered
+from its own real YouTube moment and verified frame by frame; the full
+index is in [examples/styles/README.md](examples/styles/README.md).
 
-> **v8.8 (2026-11-17):** the app now ships **18 caption styles** (see
-> [PRODUCTION-READY.md](PRODUCTION-READY.md)). The gallery below is the
-> v8.7 set — it is being refreshed to the 18-style set; `doac` was retired
-> from the app in v8.8 (its folder stays here as history).
+> **v8.9 (2026-11-17):** the gallery now shows all **18 caption styles**,
+> each from a different video — no more "same clip, seven ways". `doac`
+> was retired from the app in v8.8 (its folder stays here as history).
 
 | Style | Preview (plays by itself) | Full clip |
 |---|---|---|
-| **DOAC** — the locked production standard: 4:5 crop with blur-fill bars, yellow hook title, captions below the picture | <img src="examples/styles/doac/clip.gif" width="135" alt="DOAC style preview — looping clip"> | [doac/clip.mp4](examples/styles/doac/clip.mp4) |
-| **Karaoke** — Hormozi style: Anton 72pt, yellow current word, ALL CAPS, word pop | <img src="examples/styles/karaoke/clip.gif" width="135" alt="Karaoke style preview — looping clip"> | [karaoke/clip.mp4](examples/styles/karaoke/clip.mp4) |
-| **Minimal** — Montserrat ExtraBold 54pt, small white sentence-case captions, no pop | <img src="examples/styles/minimal/clip.gif" width="135" alt="Minimal style preview — looping clip"> | [minimal/clip.mp4](examples/styles/minimal/clip.mp4) |
-| **Lime** — Anton 72pt with a lime `#C6F135` highlight on the current words | <img src="examples/styles/lime/clip.gif" width="135" alt="Lime style preview — looping clip"> | [lime/clip.mp4](examples/styles/lime/clip.mp4) |
-| **Sentence** — Noto Sans 46pt, one full sentence at a time on a semi-transparent black box | <img src="examples/styles/sentence/clip.gif" width="135" alt="Sentence style preview — looping clip"> | [sentence/clip.mp4](examples/styles/sentence/clip.mp4) |
-| **Top** — Anton 72pt, yellow karaoke captions pinned to the top of the frame | <img src="examples/styles/top/clip.gif" width="135" alt="Top style preview — looping clip"> | [top/clip.mp4](examples/styles/top/clip.mp4) |
-| **Flash** — Bebas Neue 120pt, one huge word at a time, centre frame | <img src="examples/styles/flash/clip.gif" width="135" alt="Flash style preview — looping clip"> | [flash/clip.mp4](examples/styles/flash/clip.mp4) |
+| **Hormozi V1** — Anton 72pt, red current word, ALL CAPS, word pop (Boxing) | <img src="examples/styles/hormozi-v1/clip.gif" width="135" alt="Hormozi V1 style preview — looping clip"> | [hormozi-v1/clip.mp4](examples/styles/hormozi-v1/clip.mp4) |
+| **Red Line** — Anton 68pt, rose wordbox following the word (Boxing) | <img src="examples/styles/red-line/clip.gif" width="135" alt="Red Line style preview — looping clip"> | [red-line/clip.mp4](examples/styles/red-line/clip.mp4) |
+| **Undercut** — Playfair Display Italic 58pt, yellow, sweeping in (Apex) | <img src="examples/styles/undercut/clip.gif" width="135" alt="Undercut style preview — looping clip"> | [undercut/clip.mp4](examples/styles/undercut/clip.mp4) |
+| **Streamline** — Anton 68pt, purple wordbox sliding in (Boxing) | <img src="examples/styles/streamline/clip.gif" width="135" alt="Streamline style preview — looping clip"> | [streamline/clip.mp4](examples/styles/streamline/clip.mp4) |
+| **Hormozi Short 2026-A** — Bebas Neue 64pt, white, slide-up (Apex) | <img src="examples/styles/hormozi-2026-a/clip.gif" width="135" alt="Hormozi Short 2026-A style preview — looping clip"> | [hormozi-2026-a/clip.mp4](examples/styles/hormozi-2026-a/clip.mp4) |
+| **Hormozi Short 2026-B** — Anton 72pt, amber glow, pulse (Raj) | <img src="examples/styles/hormozi-2026-b/clip.gif" width="135" alt="Hormozi Short 2026-B style preview — looping clip"> | [hormozi-2026-b/clip.mp4](examples/styles/hormozi-2026-b/clip.mp4) |
+| **Hormozi Short 2026-C** — Montserrat ExtraBold 40pt, teal, fade (Boxing) | <img src="examples/styles/hormozi-2026-c/clip.gif" width="135" alt="Hormozi Short 2026-C style preview — looping clip"> | [hormozi-2026-c/clip.mp4](examples/styles/hormozi-2026-c/clip.mp4) |
+| **Hormozi Short 2026-D** — Bebas Neue 110pt, blue, one huge word at a time, centre frame (Apex) | <img src="examples/styles/hormozi-2026-d/clip.gif" width="135" alt="Hormozi Short 2026-D style preview — looping clip"> | [hormozi-2026-d/clip.mp4](examples/styles/hormozi-2026-d/clip.mp4) |
+| **Hormozi Short 2026-E** — Anton 72pt, light-green glow, pulse-glow (Raj) | <img src="examples/styles/hormozi-2026-e/clip.gif" width="135" alt="Hormozi Short 2026-E style preview — looping clip"> | [hormozi-2026-e/clip.mp4](examples/styles/hormozi-2026-e/clip.mp4) |
+| **MrBeast** — Anton 76pt, orange, pop-big (MrBeast) | <img src="examples/styles/mrbeast/clip.gif" width="135" alt="MrBeast style preview — looping clip"> | [mrbeast/clip.mp4](examples/styles/mrbeast/clip.mp4) |
+| **Iman-A** — Montserrat 56pt, slate, slide-down (Raj) | <img src="examples/styles/iman-a/clip.gif" width="135" alt="Iman-A style preview — looping clip"> | [iman-a/clip.mp4](examples/styles/iman-a/clip.mp4) |
+| **Cardone-A** — Anton 72pt, maroon outline, bounce (Cricket) | <img src="examples/styles/cardone-a/clip.gif" width="135" alt="Cardone-A style preview — looping clip"> | [cardone-a/clip.mp4](examples/styles/cardone-a/clip.mp4) |
+| **Hollywood Fill** — Anton 72pt, navy outline, flip (Apex) | <img src="examples/styles/hollywood-fill/clip.gif" width="135" alt="Hollywood Fill style preview — looping clip"> | [hollywood-fill/clip.mp4](examples/styles/hollywood-fill/clip.mp4) |
+| **Roman** — Anton 68pt, burnt-orange wordbox, flip (MrBeast) | <img src="examples/styles/roman/clip.gif" width="135" alt="Roman style preview — looping clip"> | [roman/clip.mp4](examples/styles/roman/clip.mp4) |
+| **SARA** — Poppins ExtraBold 66pt, pink glow, bounce-soft (Raj) | <img src="examples/styles/sara/clip.gif" width="135" alt="SARA style preview — looping clip"> | [sara/clip.mp4](examples/styles/sara/clip.mp4) |
+| **ALI** — Montserrat 48pt, grey line-box, typewriter (Cricket) | <img src="examples/styles/ali/clip.gif" width="135" alt="ALI style preview — looping clip"> | [ali/clip.mp4](examples/styles/ali/clip.mp4) |
+| **Axel** — Poppins ExtraBold 60pt, dark-green wordbox, zoom (MrBeast) | <img src="examples/styles/axel/clip.gif" width="135" alt="Axel style preview — looping clip"> | [axel/clip.mp4](examples/styles/axel/clip.mp4) |
+| **YELLOW BURST** — Anton 72pt, pale-yellow text on a near-black box, rise (Cricket) | <img src="examples/styles/yellow-burst/clip.gif" width="135" alt="YELLOW BURST style preview — looping clip"> | [yellow-burst/clip.mp4](examples/styles/yellow-burst/clip.mp4) |
 
 ## How it works
 
