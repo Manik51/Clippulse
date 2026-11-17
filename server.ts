@@ -1376,13 +1376,17 @@ async function startServer() {
       thumbnailUrl: string;
       durationSec: number;
       qualityNote: string;
+      views: number | null;
     }> = [];
 
     const ytDlpBin = resolveYtDlpBinary();
     if (ytDlpBin) {
       try {
+        // Post-launch the grid must show the biggest channels' gameplay, so
+        // search broad ("GTA 6 gameplay") and rank by view count — the same
+        // view-sorted pattern /api/trending uses.
         const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
-          'GTA 6 official gameplay trailer 4K 60fps'
+          'GTA 6 gameplay'
         )}`;
         const raw = await runProcessCapture(
           ytDlpBin,
@@ -1393,7 +1397,7 @@ async function startServer() {
             '--dump-single-json',
             '--no-warnings',
             '--playlist-end',
-            '8',
+            '12',
             searchUrl,
           ],
           12000
@@ -1405,12 +1409,16 @@ async function startServer() {
             channel?: string;
             uploader?: string;
             duration?: number | null;
+            view_count?: number;
           }>;
         };
         const entries = (parsed.entries || [])
           .filter((e) => e?.id && (!e.duration || e.duration >= 60))
-          .sort((a, b) => (b.duration || 0) - (a.duration || 0))
-          .slice(0, 3);
+          .sort(
+            (a, b) =>
+              (b.view_count ?? 0) - (a.view_count ?? 0) || (b.duration || 0) - (a.duration || 0)
+          )
+          .slice(0, 6);
 
         for (const entry of entries) {
           if (!entry.id) continue;
@@ -1422,6 +1430,7 @@ async function startServer() {
             thumbnailUrl: `https://i.ytimg.com/vi/${entry.id}/hqdefault.jpg`,
             durationSec: Math.max(90, Math.round(entry.duration || 120)),
             qualityNote: 'Best Quality 1080p/4K via yt-dlp',
+            views: typeof entry.view_count === 'number' ? entry.view_count : null,
           });
         }
       } catch {
@@ -1434,8 +1443,8 @@ async function startServer() {
         searchUrl.searchParams.set('type', 'video');
         searchUrl.searchParams.set('order', 'viewCount');
         searchUrl.searchParams.set('videoDefinition', 'high');
-        searchUrl.searchParams.set('maxResults', '4');
-        searchUrl.searchParams.set('q', 'GTA 6 gameplay trailer 4K 60fps');
+        searchUrl.searchParams.set('maxResults', '6');
+        searchUrl.searchParams.set('q', 'GTA 6 gameplay');
         searchUrl.searchParams.set('key', ytApiKey!);
         const r = await fetch(searchUrl.toString(), { signal: AbortSignal.timeout(5000) });
         if (r.ok) {
@@ -1449,7 +1458,7 @@ async function startServer() {
               };
             }>;
           };
-          for (const item of (json.items || []).slice(0, 3)) {
+          for (const item of (json.items || []).slice(0, 6)) {
             if (!item.id?.videoId) continue;
             videos.push({
               videoId: item.id.videoId,
@@ -1459,12 +1468,29 @@ async function startServer() {
               thumbnailUrl: item.snippet?.thumbnails?.high?.url || '',
               durationSec: 120,
               qualityNote: 'HD/4K via YouTube Search',
+              views: null,
             });
           }
         }
       } catch {
         // Fall through
       }
+    }
+
+    // The grounded summary is AI text and has stated a wrong launch date
+    // before (Nov 16 instead of the verified Nov 19, 2026), and it can
+    // carry markdown markers the panel renders as plain text. Only trust
+    // a grounded summary that states the verified launch date; otherwise
+    // fall back to the verified fact. Ungrounded placeholders are left
+    // alone so a missing key still shows as a config problem.
+    if (usedSearchGrounding) {
+      const cleanedSummary = releaseSummary.replace(/\*\*/g, '').replace(/__/g, '').trim();
+      const statesLaunchDate = /november\s+19|nov\.?\s+19|19\s+november|19\s+nov/i.test(
+        cleanedSummary
+      );
+      releaseSummary = statesLaunchDate
+        ? cleanedSummary
+        : 'Grand Theft Auto VI launches Thursday, November 19, 2026, at midnight local time on PS5 and Xbox Series X|S. Pre-load opened November 10, 2026.';
     }
 
     res.json({

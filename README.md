@@ -67,7 +67,7 @@ moments and verified frame by frame; the full index is in
 1. **Paste a link, or fetch trends** — any YouTube link (watch, youtu.be, Shorts, live, embed, or a bare video ID), or the trending long videos of 10 default creators, re-sorted by real view count.
 2. **Smart analyze** — the full video is transcribed with real Whisper speech-to-text, and a real audio-energy profile is measured. A sliding window scores every moment at your chosen clip length (30s by default) on hook strength, payoff, emotion and audio peaks.
 3. **4 clips, scored** — the top 4 non-overlapping moments, each with a suggested title and hook. Preview each one in the page.
-4. **Render & download** — local MP4 via ffmpeg in 720p, 1080p or 4K, with the DOAC edit style and burned-in captions.
+4. **Render & download** — local MP4 via ffmpeg in 720p, 1080p or 4K, with your chosen caption style (18 styles) and burned-in captions.
 
 ## Screenshots
 
@@ -81,11 +81,33 @@ The real app, running at `http://localhost:3000`.
 
 ![How to use ClipPulse — four steps](assets/how-to-use.png)
 
+## 🎮 GTA 6 Tab — countdown to launch, then clip the biggest gameplay
+
+**Grand Theft Auto VI launches Thursday, November 19, 2026** — midnight local time, PS5 and Xbox Series X|S. The GTA 6 tab is a dedicated Vice City–themed space for it: dark background, neon pink-purple-cyan sunset, glowing countdown digits.
+
+![GTA 6 tab — Vice City neon countdown to the Nov 19, 2026 launch](assets/screenshots/ui-gta6.png)
+
+1. **Countdown** — live ticking days / hours / minutes / seconds to local midnight Nov 19.
+2. **Launch flips it LIVE** — the countdown stops, a glowing LIVE badge appears, and the tab auto-loads the biggest GTA 6 gameplay on YouTube.
+3. **Thumbnail grid** — the biggest channels streaming and posting GTA 6 gameplay, ranked by real view count, with thumbnails and view-count chips. No fake data — live yt-dlp search, refreshed on demand.
+4. **Click any card to clip it** — the video loads straight into the Workbench, ready to cut into Shorts.
+
+Checked Nov 17, 2026 — what the live grid looked like two days before launch (the live tab always shows the current top videos; this table is a snapshot):
+
+| Channel | Video | Views |
+|---|---|---|
+| Rockstar Games | Grand Theft Auto VI: An Extended Look | 37.9M |
+| Hollow | New GTA 6 Gameplay Just Blew Everyones Mind.. | 2.3M |
+| GameCheck | GTA 6 Official Gameplay Trailer (2026) | 913K |
+| Hollow | New GTA 6 Photorealistic Gameplay Just Dropped.. | 550K |
+| TmarTn2 | GTA 6 - Everything You Need to Know | 449K |
+| TmarTn2 | New GTA 6 Gameplay Looks Absolutely Unreal | 428K |
+
 ## Features
 
 - **Smart analyze** — full-video Groq Whisper transcription + real audio-energy profile + sliding-window virality scoring (no preset transcripts, no fake scores)
-- **DOAC edit style** — the production standard above, measured from a Diary of a CEO Short and locked in by the owner
-- **Hormozi-style captions** — Anton, ALL CAPS, word-pop karaoke engine, also available for non-DOAC renders
+- **18 caption styles** — each with its own font, accent colour, highlight and motion; no two alike (see the gallery above). Font size, colour and caption position are adjustable per render
+- **GTA 6 tab** — Vice City–themed countdown to the Nov 19, 2026 launch, then a live grid of the biggest GTA 6 gameplay channels; click any card to clip it
 - **Trending fetch** — 10 default creators (MrBeast, IShowSpeed, Kai Cenat, Raj Shamani, Joe Rogan, PewDiePie, Markiplier, Airrack, Dude Perfect, Dream), 1-hour cache
 - **Paste-a-link** — validated YouTube URLs only; anything else is rejected, not guessed at
 - **Scene-aware editing** — PySceneDetect cuts, smooth face tracking, per-scene framing decisions
@@ -135,9 +157,9 @@ npm test   # 35 tests, virality scoring + subtitle + layout logic
 npm run lint
 ```
 
-## The DOAC production standard
+## The DOAC production standard (retired in v8.8 — history)
 
-The clip style was not guessed. It was measured, frame by frame, from a Diary of a CEO Short ("A Soviet Grocery Store Had Only 77 Items"), then built as one sample, checked shot by shot, and approved before it became the standard.
+The clip style was not guessed. It was measured, frame by frame, from a Diary of a CEO Short ("A Soviet Grocery Store Had Only 77 Items"), then built as one sample, checked shot by shot, and approved before it became the standard. In v8.8 the owner released it ("doac ta lagbe na") and the app moved to 18 reference caption styles with Hormozi V1 as the default. The spec below is kept as the history of that standard; the sample clip stays in `examples/`.
 
 | Element | Spec |
 |---|---|

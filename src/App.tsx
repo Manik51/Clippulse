@@ -584,10 +584,30 @@ export default function App() {
           >
             {lang === 'bn' ? 'ট্রেন্ডিং' : 'Trending'}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'gta6'}
+            onClick={() => handleSelectTab('gta6', 'top')}
+            className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+              activeTab === 'gta6' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+            }`}
+          >
+            GTA 6
+          </button>
         </div>
 
         {activeTab === 'trending' ? (
           <TrendingClipsPanel captionStyle={captionStyle} captionOverrides={captionOverrides} />
+        ) : activeTab === 'gta6' ? (
+          <Gta6TrackerPanel
+            lang={lang}
+            onLoadGta6Clip={(gtaSource, note) => {
+              setCopyrightSafeTransform(true);
+              loadSourceIntoStudio(gtaSource, undefined, note);
+              handleSelectTab('workbench', 'timeline-section');
+            }}
+          />
         ) : activeTab === 'workbench' ? (
           <>
             <SourceInputBar
@@ -629,15 +649,6 @@ export default function App() {
               onToggleCcOnly={setCcOnly}
               onAutoFetch={handleAutoFetchPack}
               onLoadPackItem={handleLoadPackItem}
-            />
-
-            <Gta6TrackerPanel
-              lang={lang}
-              onLoadGta6Clip={(gtaSource, note) => {
-                setCopyrightSafeTransform(true);
-                loadSourceIntoStudio(gtaSource, undefined, note);
-                document.getElementById('timeline-section')?.scrollIntoView({ behavior: 'smooth' });
-              }}
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

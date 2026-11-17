@@ -32,7 +32,7 @@ export interface CaptionOverrides {
   positionPct?: number;
 }
 
-export type WorkspaceTab = 'workbench' | 'blueprint' | 'trending';
+export type WorkspaceTab = 'workbench' | 'blueprint' | 'trending' | 'gta6';
 
 export type VideoCategory = 'podcast' | 'cricket' | 'boxing' | 'football' | 'gaming';
 

@@ -58,6 +58,17 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             {lang === 'bn' ? 'ট্রেন্ডিং ক্লিপ' : 'Trending Clips'}
           </button>
+          <button
+            type="button"
+            onClick={() => onSelectTab('gta6', 'top')}
+            className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
+              activeTab === 'gta6'
+                ? 'border-rose-600 text-slate-900 font-semibold'
+                : 'border-transparent hover:text-slate-900'
+            }`}
+          >
+            GTA 6
+          </button>
         </nav>
       </div>
     </header>
