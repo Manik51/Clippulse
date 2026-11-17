@@ -12,18 +12,15 @@ import { TrendingClipsPanel } from './components/TrendingClipsPanel';
 import { ViralityTimeline } from './components/ViralityTimeline';
 import { ReelPreviewPanel } from './components/ReelPreviewPanel';
 import { BackendBlueprintView } from './components/BackendBlueprintView';
-import { ExportModal } from './components/ExportModal';
 import { PRESET_VIDEOS } from './lib/presets';
 import {
   CATEGORY_WEIGHTS,
   DEFAULT_WEIGHTS,
   buildAutoFetchPack,
-  buildFfmpegCommand,
   buildSlidingWindows,
   buildUploadedVideoSource,
   calculateWeightedScore,
   evaluateCopyrightSafety,
-  generateAssSubtitle,
   parseCustomTranscriptToSource,
   reweightWindows,
 } from './lib/virality';
@@ -98,10 +95,8 @@ export default function App() {
   const [hookText, setHookText] = useState<string>(initialTopWin?.suggestedHooks[0] || '');
   const [faceOffsetX, setFaceOffsetX] = useState<number>(initialTopWin?.faceOffsetX || 50);
   const [includeCredit, setIncludeCredit] = useState<boolean>(true);
-  const [serverlessSectionOnly, setServerlessSectionOnly] = useState<boolean>(true);
   const [copyrightSafeTransform, setCopyrightSafeTransform] = useState<boolean>(true);
   const [mirrorFlip, setMirrorFlip] = useState<boolean>(false);
-  const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const analysisReqIdRef = useRef<number>(0);
 
   const topWindowId = useMemo(() => findTopWindowId(windows), [windows]);
@@ -398,14 +393,14 @@ export default function App() {
         setShowTranscriptInput(true);
         setValidationError(
           meta?.found && meta?.title
-            ? `Resolved "${meta.title}" by ${meta.channel}. Browser preview cannot run yt-dlp/Whisper directly — paste transcript lines below to score windows here, or deploy the Serverless Worker in Backend Code.`
-            : 'Browser preview cannot run yt-dlp/Whisper directly on arbitrary URLs — paste transcript lines below to score windows, or deploy the Modal/Cloud Run Serverless Worker.'
+            ? `Resolved "${meta.title}" by ${meta.channel}. Browser preview cannot run yt-dlp/Whisper directly — paste transcript lines below to score windows here, or use Trending Clips, which runs the full pipeline on the server.`
+            : 'Browser preview cannot run yt-dlp/Whisper directly on arbitrary URLs — paste transcript lines below to score windows, or use Trending Clips, which runs the full pipeline on the server.'
         );
       } catch {
         if (analysisReqIdRef.current !== reqId) return;
         setShowTranscriptInput(true);
         setValidationError(
-          'Paste transcript lines below to score custom windows in the browser, or deploy the Serverless Worker in Backend Code.'
+          'Paste transcript lines below to score custom windows in the browser, or use Trending Clips — it runs the full pipeline on the server.'
         );
       } finally {
         if (analysisReqIdRef.current === reqId) {
@@ -557,56 +552,12 @@ export default function App() {
     }, 60);
   };
 
-  const assContent = useMemo(
-    () =>
-      selectedWindow
-        ? generateAssSubtitle(
-            source.segments,
-            selectedWindow.startSec,
-            selectedWindow.endSec,
-            hookText,
-            captionStyle,
-            includeCredit ? `CC-BY Source: ${source.channel}` : undefined,
-            copyrightSafeTransform,
-            undefined,
-            captionOverrides
-          )
-        : '',
-    [source.segments, source.channel, selectedWindow, hookText, captionStyle, includeCredit, copyrightSafeTransform, captionOverrides]
-  );
-
-  const ffmpegCommand = useMemo(
-    () =>
-      selectedWindow
-        ? buildFfmpegCommand({
-            youtubeUrl: source.youtubeUrl,
-            startSec: selectedWindow.startSec,
-            endSec: selectedWindow.endSec,
-            faceOffsetX,
-            framingMode,
-            serverlessSectionOnly,
-            copyrightSafeTransform,
-            mirrorFlip,
-          })
-        : '',
-    [
-      source.youtubeUrl,
-      selectedWindow,
-      faceOffsetX,
-      framingMode,
-      serverlessSectionOnly,
-      copyrightSafeTransform,
-      mirrorFlip,
-    ]
-  );
-
   return (
     <div id="top" className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       <TopBar
         activeTab={activeTab}
         lang={lang}
         onSelectTab={handleSelectTab}
-        onOpenExport={() => setIsExportOpen(true)}
       />
 
       <main className="flex-1 max-w-[1440px] w-full mx-auto px-6 py-6 space-y-6">
@@ -632,17 +583,6 @@ export default function App() {
             }`}
           >
             {lang === 'bn' ? 'ট্রেন্ডিং' : 'Trending'}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'blueprint'}
-            onClick={() => handleSelectTab('blueprint', 'top')}
-            className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors whitespace-nowrap cursor-pointer ${
-              activeTab === 'blueprint' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
-            }`}
-          >
-            {lang === 'bn' ? 'সার্ভারলেস ব্যাকএন্ড' : 'Serverless Backend'}
           </button>
         </div>
 
@@ -748,7 +688,6 @@ export default function App() {
                     onFramingModeChange={setFramingMode}
                     onFaceOffsetXChange={setFaceOffsetX}
                     onToggleCredit={setIncludeCredit}
-                    onOpenExport={() => setIsExportOpen(true)}
                   />
                 )}
               </div>
@@ -770,39 +709,10 @@ export default function App() {
             >
               Workbench
             </button>
-            <button
-              type="button"
-              onClick={() => handleSelectTab('blueprint', 'backend-code')}
-              className="hover:text-slate-900 transition-colors cursor-pointer"
-            >
-              Modal.com &amp; Cloud Run Serverless
-            </button>
           </div>
         </div>
       </footer>
 
-      {selectedWindow && (
-        <ExportModal
-          isOpen={isExportOpen}
-          youtubeUrl={source.youtubeUrl}
-          uploadId={source.uploadedVideoId}
-          thumbnailUrl={source.thumbnailUrl}
-          category={source.category}
-          framingMode={framingMode}
-          faceOffsetX={faceOffsetX}
-          selectedWindow={selectedWindow}
-          assContent={assContent}
-          ffmpegCommand={ffmpegCommand}
-          serverlessSectionOnly={serverlessSectionOnly}
-          copyrightSafeTransform={copyrightSafeTransform}
-          mirrorFlip={mirrorFlip}
-          lang={lang}
-          onToggleSectionOnly={setServerlessSectionOnly}
-          onToggleSafeTransform={setCopyrightSafeTransform}
-          onToggleMirrorFlip={setMirrorFlip}
-          onClose={() => setIsExportOpen(false)}
-        />
-      )}
     </div>
   );
 }

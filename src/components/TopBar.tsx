@@ -1,19 +1,16 @@
 import React from 'react';
-import { Scissors } from 'lucide-react';
 import type { LanguageMode, WorkspaceTab } from '../lib/types';
 
 interface TopBarProps {
   activeTab: WorkspaceTab;
   lang: LanguageMode;
   onSelectTab: (tab: WorkspaceTab, sectionId?: string) => void;
-  onOpenExport: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   activeTab,
   lang,
   onSelectTab,
-  onOpenExport,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200">
@@ -61,37 +58,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             {lang === 'bn' ? 'ট্রেন্ডিং ক্লিপ' : 'Trending Clips'}
           </button>
-          <button
-            type="button"
-            onClick={() => onSelectTab('blueprint', 'backend-code')}
-            className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
-              activeTab === 'blueprint'
-                ? 'border-rose-600 text-slate-900 font-semibold'
-                : 'border-transparent hover:text-slate-900'
-            }`}
-          >
-            {lang === 'bn' ? 'পাইথন ব্যাকএন্ড' : 'Backend Code'}
-          </button>
-          <button
-            type="button"
-            onClick={() => onSelectTab('blueprint', 'free-stack')}
-            className="whitespace-nowrap shrink-0 py-1 border-b-2 border-transparent hover:text-slate-900 transition-colors cursor-pointer"
-          >
-            {lang === 'bn' ? 'ফ্রি স্ট্যাক' : 'Free Stack'}
-          </button>
         </nav>
-
-        {/* Zone 3: 1 primary CTA */}
-        <div className="flex items-center shrink-0">
-          <button
-            type="button"
-            onClick={onOpenExport}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
-          >
-            <Scissors className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>{lang === 'bn' ? 'এক্সপোর্ট .ASS ও FFmpeg' : 'Export .ASS & FFmpeg'}</span>
-          </button>
-        </div>
       </div>
     </header>
   );

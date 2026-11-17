@@ -59,7 +59,6 @@ interface ReelPreviewPanelProps {
   onFramingModeChange: (mode: FramingMode) => void;
   onFaceOffsetXChange: (x: number) => void;
   onToggleCredit: (val: boolean) => void;
-  onOpenExport: () => void;
 }
 
 export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
@@ -85,7 +84,6 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
   onFramingModeChange,
   onFaceOffsetXChange,
   onToggleCredit,
-  onOpenExport,
 }) => {
   const [imageError, setImageError] = useState(false);
   const [showFaceBox, setShowFaceBox] = useState(true);
@@ -736,14 +734,6 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
             </div>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={onOpenExport}
-          className="w-full h-10 text-sm font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
-        >
-          {lang === 'bn' ? 'ডাউনলোড .ASS ও Serverless FFmpeg দেখুন' : 'View .ASS & Serverless FFmpeg Command'}
-        </button>
       </div>
     </aside>
   );
