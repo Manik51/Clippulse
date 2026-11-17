@@ -4,11 +4,13 @@ import {
   GTA6_LAUNCH_DAY,
   GTA6_LAUNCH_MONTH_INDEX,
   GTA6_LAUNCH_YEAR,
+  buildGta6Source,
   formatCountdownPart,
   formatGta6Views,
   getGta6Countdown,
   gta6LaunchDate,
 } from './gta6';
+import type { Gta6VideoCandidate } from './gta6';
 
 test('launch target is local midnight, November 19, 2026', () => {
   const target = gta6LaunchDate();
@@ -78,4 +80,54 @@ test('view count chips compact to K / M, null stays null', () => {
   assert.equal(formatGta6Views(34_000), '34K');
   assert.equal(formatGta6Views(1_234_567), '1.2M');
   assert.equal(formatGta6Views(25_000_000), '25M');
+});
+
+const REAL_CANDIDATE: Gta6VideoCandidate = {
+  videoId: 'dQw4w9WgXcQ',
+  title: 'Grand Theft Auto VI: An Extended Look',
+  channel: 'Rockstar Games',
+  youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+  thumbnailUrl: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+  durationSec: 1800,
+  qualityNote: 'Best Quality 1080p/4K via yt-dlp',
+  views: 37_927_003,
+};
+
+test('buildGta6Source carries only the video’s real metadata', () => {
+  const src = buildGta6Source(REAL_CANDIDATE);
+  assert.equal(src.id, 'gta6-dQw4w9WgXcQ');
+  assert.equal(src.title, REAL_CANDIDATE.title);
+  assert.equal(src.channel, REAL_CANDIDATE.channel);
+  assert.equal(src.youtubeUrl, REAL_CANDIDATE.youtubeUrl);
+  assert.equal(src.thumbnailUrl, REAL_CANDIDATE.thumbnailUrl);
+  assert.equal(src.durationSec, REAL_CANDIDATE.durationSec);
+  assert.equal(src.category, 'gaming');
+});
+
+test('buildGta6Source invents no transcript, hooks or energy', () => {
+  const src = buildGta6Source(REAL_CANDIDATE);
+  assert.deepEqual(src.segments, []);
+  assert.equal(src.presetHooks, undefined);
+  assert.deepEqual(src.audioEnergyProfile, []);
+  assert.deepEqual(src.faceTrackProfile, []);
+});
+
+test('buildGta6Source contains no fabricated Vice City placeholder text', () => {
+  const src = buildGta6Source(REAL_CANDIDATE);
+  const flat = JSON.stringify(src);
+  for (const banned of [
+    'Vice City',
+    'ray-traced',
+    'Leonida',
+    'helicopter',
+    'drawbridge',
+    'Welcome back',
+    'hookScore',
+  ]) {
+    assert.equal(
+      flat.includes(banned),
+      false,
+      `built source must not contain fabricated text: "${banned}"`
+    );
+  }
 });

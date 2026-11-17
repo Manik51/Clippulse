@@ -134,7 +134,15 @@ export default function App() {
 
   const loadSourceIntoStudio = (targetSource: VideoSource, customWindows?: SlidingWindow[], note?: string) => {
     const catWeights = CATEGORY_WEIGHTS[targetSource.category] || DEFAULT_WEIGHTS;
-    const nextWindows = customWindows || buildSlidingWindows(targetSource, catWeights);
+    // A source with no transcript has nothing real to score. Building
+    // windows from empty segments would show baseline scores and generic
+    // hook lines as if they were the video's real moments — so an
+    // unanalyzed source loads with NO windows, and the workbench shows
+    // an honest "not analyzed yet" state instead. Analyzed sources
+    // (presets, pasted transcripts, Analyze results) are unaffected.
+    const hasTranscript = targetSource.segments.length > 0;
+    const nextWindows =
+      customWindows || (hasTranscript ? buildSlidingWindows(targetSource, catWeights) : []);
     const bestId = findTopWindowId(nextWindows);
     const bestWin = nextWindows.find((w) => w.id === bestId) || nextWindows[0];
 
@@ -143,7 +151,16 @@ export default function App() {
     setYoutubeUrl(targetSource.youtubeUrl);
     setFramingMode(targetSource.framingMode);
     setWindows(nextWindows);
-    if (bestWin) applySelectedWindow(bestWin);
+    if (bestWin) {
+      applySelectedWindow(bestWin);
+    } else {
+      // No window to select: clear the previous video's hook, face
+      // offset and playback position so nothing stale is shown.
+      setHookText('');
+      setFaceOffsetX(50);
+      setPlaybackTime(0);
+      setIsPlaying(false);
+    }
     if (note) setStatusMessage(note);
   };
 
@@ -653,18 +670,33 @@ export default function App() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               <div className="lg:col-span-7 xl:col-span-8">
-                {selectedWindow && (
-                  <ViralityTimeline
-                    source={source}
-                    windows={windows}
-                    selectedWindow={selectedWindow}
-                    topWindowId={topWindowId}
-                    weights={weights}
-                    lang={lang}
-                    onSelectWindow={handleSelectWindow}
-                    onChangeWeight={handleChangeWeight}
-                    onResetWeights={handleResetWeights}
-                  />
+                {windows.length === 0 ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+                    <p className="text-sm font-semibold text-amber-900">
+                      {lang === 'bn'
+                        ? 'এই ভিডিওটি এখনো অ্যানালাইজ হয়নি — কোনো ট্রান্সক্রিপ্ট বা স্কোর নেই'
+                        : 'This video isn’t analyzed yet — no transcript, no scores'}
+                    </p>
+                    <p className="text-sm text-amber-800 mt-1 leading-relaxed">
+                      {lang === 'bn'
+                        ? 'পুরো অ্যানালাইসিসের জন্য Trending Clips ট্যাবে গিয়ে ভিডিওর লিংকটি পেস্ট করুন, অথবা নিচে ট্রান্সক্রিপ্ট পেস্ট করে Analyze চাপুন। অ্যানালাইজ না হওয়া পর্যন্ত এখানে কোনো ক্লিপ বা স্কোর দেখানো হবে না।'
+                        : 'Paste this video’s link in the Trending Clips tab for the full server analysis, or paste a transcript below and press Analyze. No clips or scores are shown until the video is actually analyzed.'}
+                    </p>
+                  </div>
+                ) : (
+                  selectedWindow && (
+                    <ViralityTimeline
+                      source={source}
+                      windows={windows}
+                      selectedWindow={selectedWindow}
+                      topWindowId={topWindowId}
+                      weights={weights}
+                      lang={lang}
+                      onSelectWindow={handleSelectWindow}
+                      onChangeWeight={handleChangeWeight}
+                      onResetWeights={handleResetWeights}
+                    />
+                  )
                 )}
               </div>
 

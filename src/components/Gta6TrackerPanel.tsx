@@ -1,19 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, ExternalLink, Eye, Gamepad2, RefreshCw, Sparkles, Video } from 'lucide-react';
 import type { LanguageMode, VideoSource } from '../lib/types';
-import { formatCountdownPart, formatGta6Views, getGta6Countdown } from '../lib/gta6';
-import type { Gta6Countdown } from '../lib/gta6';
-
-interface Gta6VideoCandidate {
-  videoId: string;
-  title: string;
-  channel: string;
-  youtubeUrl: string;
-  thumbnailUrl: string;
-  durationSec: number;
-  qualityNote: string;
-  views: number | null;
-}
+import {
+  buildGta6Source,
+  formatCountdownPart,
+  formatGta6Views,
+  getGta6Countdown,
+} from '../lib/gta6';
+import type { Gta6Countdown, Gta6VideoCandidate } from '../lib/gta6';
 
 interface Gta6TrackResponse {
   usedSearchGrounding: boolean;
@@ -26,66 +20,6 @@ interface Gta6TrackResponse {
 interface Gta6TrackerPanelProps {
   lang: LanguageMode;
   onLoadGta6Clip: (source: VideoSource, note: string) => void;
-}
-
-function buildGta6Source(candidate: Gta6VideoCandidate): VideoSource {
-  const dur = Math.max(90, candidate.durationSec || 120);
-  const bucketCount = Math.ceil(dur / 5);
-  return {
-    id: `gta6-${candidate.videoId}`,
-    title: candidate.title,
-    channel: candidate.channel,
-    category: 'gaming',
-    framingMode: 'gaming-split',
-    licenseStatus: 'indie-safe',
-    licenseNote: 'Pro Viral Transform Ready (1.06x Zoom, Color Grade, Pitch/Speed & Progress Bar)',
-    youtubeUrl: candidate.youtubeUrl,
-    durationSec: dur,
-    thumbnailUrl: candidate.thumbnailUrl,
-    fallbackGradient: 'from-slate-900 via-rose-950 to-slate-950',
-    transcriptSource: 'faster-whisper',
-    segments: [
-      {
-        start: 0,
-        end: 18,
-        text: 'Welcome back to Vice City! Look at the insane ray-traced reflections and dense traffic AI right here!',
-        words: [],
-      },
-      {
-        start: 18,
-        end: 42,
-        text: 'Wait until you see this high-speed highway chase through Leonida — nobody expected this level of physics detail!',
-        words: [],
-      },
-      {
-        start: 42,
-        end: 70,
-        text: 'Watch the final 10 seconds as the police helicopter locks on across the neon Vice Beach strip!',
-        words: [],
-      },
-      {
-        start: 70,
-        end: 95,
-        text: 'That stunt jump over the drawbridge at 60 FPS looks unreal — drop your hype score below!',
-        words: [],
-      },
-    ],
-    audioEnergyProfile: Array.from({ length: bucketCount }, (_, i) =>
-      i >= 4 && i <= 14 ? 86 + ((i * 3) % 12) : 64 + ((i * 5) % 18)
-    ),
-    faceTrackProfile: Array.from({ length: bucketCount }, () => 24),
-    presetHooks: {
-      '15': {
-        hookScore: 95,
-        reason: 'High-speed GTA 6 chase + visual physics reveal',
-        hooks: [
-          'GTA 6 Vice City physics look UNREAL!',
-          'Wait for the neon highway chase at 0:42!',
-          '60 FPS Leonida gameplay — worth the wait?',
-        ],
-      },
-    },
-  };
 }
 
 export const Gta6TrackerPanel: React.FC<Gta6TrackerPanelProps> = ({ lang, onLoadGta6Clip }) => {
@@ -136,7 +70,9 @@ export const Gta6TrackerPanel: React.FC<Gta6TrackerPanelProps> = ({ lang, onLoad
   const loadVideo = (vid: Gta6VideoCandidate) => {
     onLoadGta6Clip(
       buildGta6Source(vid),
-      `Loaded GTA 6 clip (${vid.channel}) with Gaming Split + Pro Viral FFmpeg Transform.`
+      lang === 'bn'
+        ? `${vid.channel} লোড হয়েছে — এখনো অ্যানালাইজ হয়নি, কোনো স্কোর নেই। Trending Clips-এ লিংক পেস্ট করে পুরো অ্যানালাইসিস চালান, অথবা Workbench-এ ট্রান্সক্রিপ্ট পেস্ট করে Analyze করুন।`
+        : `Loaded ${vid.channel} — not analyzed yet, no scores. Paste this link in Trending Clips for the full analysis, or paste a transcript in the Workbench and press Analyze.`
     );
   };
 

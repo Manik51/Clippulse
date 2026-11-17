@@ -48,10 +48,56 @@ export function formatCountdownPart(n: number): string {
   return String(Math.max(0, Math.floor(n))).padStart(2, '0');
 }
 
+import type { VideoSource } from './types';
+
 /** Compact view count for the video grid chips: 1_234_567 -> "1.2M". */
 export function formatGta6Views(views: number | null | undefined): string | null {
   if (typeof views !== 'number' || !Number.isFinite(views) || views < 0) return null;
   if (views >= 1_000_000) return `${(views / 1_000_000).toFixed(views >= 10_000_000 ? 0 : 1)}M`;
   if (views >= 1_000) return `${Math.round(views / 1_000)}K`;
   return `${views}`;
+}
+
+export interface Gta6VideoCandidate {
+  videoId: string;
+  title: string;
+  channel: string;
+  youtubeUrl: string;
+  thumbnailUrl: string;
+  durationSec: number;
+  qualityNote: string;
+  views: number | null;
+}
+
+/**
+ * Build the workbench source for a GTA 6 grid video.
+ *
+ * Deliberately carries ONLY the video's real metadata from the live
+ * search result — title, channel, URL, thumbnail, duration. No
+ * transcript, no hook scores, no audio-energy values: none of those
+ * exist until the video is actually analyzed, and inventing them made
+ * the workbench display fabricated words and scores as if they were
+ * real. Empty segments/profiles mean the workbench shows an honest
+ * "not analyzed yet" state and no scored windows; the real Analyze
+ * flow fills them in when it runs.
+ */
+export function buildGta6Source(candidate: Gta6VideoCandidate): VideoSource {
+  const dur = Math.max(90, candidate.durationSec || 120);
+  return {
+    id: `gta6-${candidate.videoId}`,
+    title: candidate.title,
+    channel: candidate.channel,
+    category: 'gaming',
+    framingMode: 'gaming-split',
+    licenseStatus: 'indie-safe',
+    licenseNote: 'Pro Viral Transform Ready (1.06x Zoom, Color Grade, Pitch/Speed & Progress Bar)',
+    youtubeUrl: candidate.youtubeUrl,
+    durationSec: dur,
+    thumbnailUrl: candidate.thumbnailUrl,
+    fallbackGradient: 'from-slate-900 via-rose-950 to-slate-950',
+    transcriptSource: 'faster-whisper',
+    segments: [],
+    audioEnergyProfile: [],
+    faceTrackProfile: [],
+  };
 }

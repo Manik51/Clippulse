@@ -71,21 +71,27 @@ moments and verified frame by frame; the full index is in
 
 ## Screenshots
 
-The real app, running at `http://localhost:3000`.
+The real app, running at `http://localhost:3000` — fresh shots of every tab, taken Nov 17, 2026.
 
-![Trending tab — channel cards with followers, after Fetch Trends](assets/screenshots/ui-trending.png)
+**Workbench** — paste a link or pick a CC-BY source, analyze, and the 4 best 60s clips are scored and ready.
 
-![A creator's trending videos, with Make 4 clips on each](assets/screenshots/ui-video.png)
+![Workbench — YouTube to Viral 60s Reel Pipeline with the 4-category clip pack](assets/screenshots/ui-workbench.png)
 
-![The clips view — scored clips ready in the page, each with a preview and a Download MP4 button](assets/screenshots/ui-clips.png)
+**Timeline** — the 60s sliding-window virality timeline with the 9:16 reel preview beside it.
 
-![How to use ClipPulse — four steps](assets/how-to-use.png)
+![Timeline — sliding-window virality timeline and 9:16 vertical reel preview](assets/screenshots/ui-timeline.png)
+
+**Trending Clips** — one click fetches the 10 default creators, re-sorted by real view count.
+
+![Trending Clips — channel cards with subscribers and top-video views, after Fetch Trends](assets/screenshots/ui-trending.png)
+
+**GTA 6** — Vice City–themed countdown to the Nov 19, 2026 launch, then the biggest gameplay channels.
+
+![GTA 6 tab — Vice City neon countdown to the Nov 19, 2026 launch](assets/screenshots/ui-gta6.png)
 
 ## 🎮 GTA 6 Tab — countdown to launch, then clip the biggest gameplay
 
-**Grand Theft Auto VI launches Thursday, November 19, 2026** — midnight local time, PS5 and Xbox Series X|S. The GTA 6 tab is a dedicated Vice City–themed space for it: dark background, neon pink-purple-cyan sunset, glowing countdown digits.
-
-![GTA 6 tab — Vice City neon countdown to the Nov 19, 2026 launch](assets/screenshots/ui-gta6.png)
+**Grand Theft Auto VI launches Thursday, November 19, 2026** — midnight local time, PS5 and Xbox Series X|S. The GTA 6 tab is a dedicated Vice City–themed space for it: dark background, neon pink-purple-cyan sunset, glowing countdown digits. (Screenshot in the gallery above.)
 
 1. **Countdown** — live ticking days / hours / minutes / seconds to local midnight Nov 19.
 2. **Launch flips it LIVE** — the countdown stops, a glowing LIVE badge appears, and the tab auto-loads the biggest GTA 6 gameplay on YouTube.
