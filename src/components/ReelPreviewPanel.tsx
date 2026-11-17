@@ -1,7 +1,40 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert, Video } from 'lucide-react';
-import { evaluateCopyrightSafety, extractWordsFromSegments } from '../lib/virality';
-import type { CaptionStyle, FramingMode, LanguageMode, SlidingWindow, VideoSource } from '../lib/types';
+import { Check, Eye, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert, Video } from 'lucide-react';
+import {
+  CAPTION_STYLE_PRESETS,
+  applyCaptionOverrides,
+  assColourToCss,
+  evaluateCopyrightSafety,
+  extractWordsFromSegments,
+  positionPctForPreset,
+} from '../lib/virality';
+import type { CaptionStylePreset } from '../lib/virality';
+import type { CaptionOverrides, CaptionStyle, FramingMode, LanguageMode, SlidingWindow, VideoSource } from '../lib/types';
+
+/** Gallery-card line style, derived from the preset — the card shows the
+ * style the way the reference does: same font, colours, highlight. */
+function cardLineStyle(preset: CaptionStylePreset, lineIndex: 0 | 1): React.CSSProperties {
+  const isB = lineIndex === 1;
+  const style: React.CSSProperties = {
+    fontFamily: `'${preset.font}', sans-serif`,
+    fontWeight: preset.bold ? 800 : 400,
+    fontStyle: preset.italic ? 'italic' : 'normal',
+    textTransform: preset.uppercase ? 'uppercase' : 'none',
+    color: assColourToCss(preset.primaryColour),
+    lineHeight: 1.2,
+    fontSize: preset.fontSize >= 100 ? 20 : preset.fontSize >= 64 ? 15 : 13,
+    textShadow: '2px 2px 0 rgba(0,0,0,0.9)',
+  };
+  if (preset.highlight === 'glow') {
+    style.textShadow = `0 0 10px ${preset.highlightCss}, 0 0 3px ${preset.highlightCss}`;
+  }
+  if (isB && preset.highlight === 'word') {
+    style.backgroundColor = preset.highlightCss;
+    style.padding = '0 4px';
+    style.borderRadius = 2;
+  }
+  return style;
+}
 
 interface ReelPreviewPanelProps {
   source: VideoSource;
@@ -10,6 +43,7 @@ interface ReelPreviewPanelProps {
   isPlaying: boolean;
   hookText: string;
   captionStyle: CaptionStyle;
+  captionOverrides: CaptionOverrides;
   framingMode: FramingMode;
   faceOffsetX: number;
   includeCredit: boolean;
@@ -21,6 +55,7 @@ interface ReelPreviewPanelProps {
   onResetPlayback: () => void;
   onHookTextChange: (val: string) => void;
   onCaptionStyleChange: (style: CaptionStyle) => void;
+  onCaptionOverridesChange: (overrides: CaptionOverrides) => void;
   onFramingModeChange: (mode: FramingMode) => void;
   onFaceOffsetXChange: (x: number) => void;
   onToggleCredit: (val: boolean) => void;
@@ -34,6 +69,7 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
   isPlaying,
   hookText,
   captionStyle,
+  captionOverrides,
   framingMode,
   faceOffsetX,
   includeCredit,
@@ -45,6 +81,7 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
   onResetPlayback,
   onHookTextChange,
   onCaptionStyleChange,
+  onCaptionOverridesChange,
   onFramingModeChange,
   onFaceOffsetXChange,
   onToggleCredit,
@@ -108,6 +145,37 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
     }
     return windowWords.slice(0, 4);
   }, [windowWords, playbackTime]);
+
+  // v8.8 — the picked preset + overrides are what BOTH the preview and
+  // the render use (same helpers as generateAssSubtitle).
+  const preset = CAPTION_STYLE_PRESETS[captionStyle];
+  const effective = useMemo(
+    () => applyCaptionOverrides(preset, captionOverrides),
+    [preset, captionOverrides]
+  );
+  const positionPct = captionOverrides.positionPct ?? positionPctForPreset(preset);
+  const fontColourCss = assColourToCss(effective.primaryColour);
+  // Effective font size for the controls: the override, else the preset
+  // (clamped to the 20–72 slider range for the thumb position only).
+  const displayFontSize = effective.fontSize;
+  const captionPosClass =
+    preset.alignment === 5
+      ? 'top-1/2 -translate-y-1/2'
+      : preset.alignment === 8
+        ? 'top-20'
+        : positionPct >= 66
+          ? 'top-1/4'
+          : positionPct >= 33
+            ? 'bottom-1/4'
+            : 'bottom-14';
+  // Flash mode shows one huge word at a time, not the whole chunk.
+  const displayWords = useMemo(() => {
+    if (preset.mode !== 'flash') return activePhrase;
+    const active = activePhrase.filter(
+      (w) => playbackTime >= w.relStart && playbackTime <= w.relEnd + 0.15
+    );
+    return active.length > 0 ? active : activePhrase.slice(0, 1);
+  }, [preset.mode, activePhrase, playbackTime]);
 
   const showHookOverlay = playbackTime <= 3.0 && hookText.trim().length > 0;
   const hasImage = Boolean(source.thumbnailUrl) && !imageError;
@@ -312,67 +380,56 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
             </div>
           )}
 
-          {/* Synchronized Karaoke .ASS Caption Preview */}
+          {/* Synchronized .ASS Caption Preview — driven by the picked
+              preset + overrides, the same values generateAssSubtitle
+              burns into the render (v8.8). */}
           <div
             data-testid="karaoke-caption-line"
-            className={`absolute ${captionStyle === 'top' ? 'top-24' : 'bottom-14'} ${captionStyle === 'minimal' ? 'left-3 text-left' : 'inset-x-3 text-center'} pointer-events-none`}
+            className={`absolute ${captionPosClass} ${preset.alignment === 1 ? 'left-3 text-left' : 'inset-x-3 text-center'} pointer-events-none`}
           >
             <div
-              className={`inline-flex flex-wrap ${captionStyle === 'minimal' ? 'justify-start' : 'justify-center'} gap-x-1.5 gap-y-0.5 ${
-                captionStyle === 'sentence' ? 'bg-black/70 px-2.5 py-1.5 rounded-lg' : ''
-              }`}
+              className={`inline-flex flex-wrap ${preset.alignment === 1 ? 'justify-start' : 'justify-center'} gap-x-1.5 gap-y-0.5`}
+              style={
+                preset.highlight === 'line'
+                  ? { backgroundColor: `${preset.highlightCss}CC`, padding: '6px 10px', borderRadius: 8 }
+                  : undefined
+              }
             >
-              {activePhrase.map((item, idx) => {
+              {displayWords.map((item, idx) => {
                 const isActive = playbackTime >= item.relStart && playbackTime <= item.relEnd + 0.15;
                 const isSpoken = playbackTime > item.relEnd + 0.15;
-
-                // v8.7: preview mirrors the real ASS look per style.
-                let wordStyle = 'text-white/85';
-                if (captionStyle === 'karaoke') {
-                  wordStyle = isActive
-                    ? 'text-amber-300 scale-105'
-                    : isSpoken
-                      ? 'text-white'
-                      : 'text-white/70';
-                } else if (captionStyle === 'top') {
-                  wordStyle = isActive
-                    ? 'text-amber-300 scale-105'
-                    : isSpoken
-                      ? 'text-white'
-                      : 'text-white/70';
-                } else if (captionStyle === 'lime') {
-                  wordStyle = isActive
-                    ? 'text-lime-300 scale-105 [text-shadow:0_0_14px_#a3e635]'
-                    : isSpoken
-                      ? 'text-white'
-                      : 'text-white/70';
-                } else if (captionStyle === 'flash') {
-                  wordStyle = isActive
-                    ? 'text-white scale-110 [text-shadow:2px_2px_0_#dc2626,0_0_16px_rgba(220,38,38,0.7)]'
-                    : 'text-white/70';
-                } else if (captionStyle === 'sentence') {
-                  wordStyle = isActive || isSpoken ? 'text-white' : 'text-white/25';
-                } else if (captionStyle === 'bold') {
-                  wordStyle = isActive ? 'text-black bg-yellow-400 px-1.5 rounded' : 'text-white/25';
-                } else {
-                  // minimal: fades in, so unspoken words are barely there.
-                  wordStyle = isActive ? 'text-white' : isSpoken ? 'text-white/80' : 'text-white/30';
+                const wordStyle: React.CSSProperties = {
+                  fontFamily: `'${preset.font}', sans-serif`,
+                  fontWeight: preset.bold ? 800 : 400,
+                  fontStyle: preset.italic ? 'italic' : 'normal',
+                  textTransform: preset.uppercase ? 'uppercase' : 'none',
+                  fontSize: `${Math.max(10, Math.round(effective.fontSize * 0.25))}px`,
+                  color: isActive
+                    ? assColourToCss(effective.primaryColour)
+                    : assColourToCss(preset.secondaryColour),
+                  opacity:
+                    preset.mode === 'wordbox' ? (isActive ? 1 : 0.15) : isActive || isSpoken ? 1 : 0.35,
+                  textShadow: '2px 2px 0 rgba(0,0,0,0.85)',
+                  lineHeight: 1.2,
+                };
+                if (preset.highlight === 'glow' && isActive) {
+                  wordStyle.textShadow = `0 0 14px ${preset.highlightCss}, 0 0 4px ${preset.highlightCss}`;
                 }
-
+                if (preset.mode === 'wordbox' && isActive) {
+                  wordStyle.backgroundColor = preset.highlightCss;
+                  wordStyle.padding = '0 6px';
+                  wordStyle.borderRadius = 3;
+                }
+                if (isActive && preset.motion === 'pop') {
+                  wordStyle.transform = 'scale(1.08)';
+                }
                 return (
                   <span
                     key={`${item.word}-${idx}`}
-                    className={`font-display transition-transform duration-100 ${
-                      captionStyle === 'flash'
-                        ? 'text-3xl font-black uppercase tracking-tight drop-shadow'
-                        : captionStyle === 'sentence'
-                          ? 'text-base font-bold tracking-tight drop-shadow'
-                          : captionStyle === 'minimal'
-                            ? 'text-sm font-medium'
-                            : 'text-base font-extrabold uppercase tracking-tight drop-shadow'
-                    } ${wordStyle}`}
+                    className="transition-transform duration-100 tracking-tight drop-shadow"
+                    style={wordStyle}
                   >
-                    {item.word}
+                    {preset.uppercase ? item.word.toUpperCase() : item.word}
                   </span>
                 );
               })}
@@ -467,27 +524,147 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
           </div>
         </div>
 
-        {/* Caption Style Switcher */}
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-medium text-slate-600">
-            {lang === 'bn' ? 'ক্যাপশন স্টাইল' : 'Caption Style'}
-          </span>
-          <div role="group" aria-label="Caption style" className="inline-flex p-1 bg-slate-100 rounded-lg">
-            {(['karaoke', 'minimal', 'bold', 'lime', 'sentence', 'top', 'flash'] as CaptionStyle[]).map((style) => (
-              <button
-                key={style}
-                type="button"
-                onClick={() => onCaptionStyleChange(style)}
-                className={`px-2.5 py-1 text-xs font-medium capitalize rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  captionStyle === style
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {style}
-              </button>
-            ))}
+        {/* Choose Style gallery (v8.8 — like the reference): named
+            cards, each a live mini-preview of its style on the sample
+            text "WATCH THIS NOW". The selected card gets the violet
+            ring + check. Below it, the reference's bottom controls —
+            Font Size, Font Color, Caption Position — which override
+            the picked style in BOTH the preview and the render. */}
+        <div className="space-y-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-slate-900">Choose Style</span>
+            <span className="text-xs font-semibold text-violet-700 bg-violet-50 px-2 py-1 rounded-md whitespace-nowrap">
+              {preset.displayName}
+            </span>
           </div>
+          <div role="group" aria-label="Caption style gallery" className="grid grid-cols-3 gap-2">
+            {(Object.keys(CAPTION_STYLE_PRESETS) as CaptionStyle[]).map((style) => {
+              const p = CAPTION_STYLE_PRESETS[style];
+              const selected = captionStyle === style;
+              return (
+                <button
+                  key={style}
+                  type="button"
+                  onClick={() => {
+                    onCaptionStyleChange(style);
+                    onCaptionOverridesChange({});
+                  }}
+                  aria-pressed={selected}
+                  className={`relative text-left rounded-md overflow-hidden border transition-colors cursor-pointer ${
+                    selected ? 'border-violet-600 ring-2 ring-violet-600/60' : 'border-slate-200 hover:border-slate-400'
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-1 bg-slate-50 px-1.5 py-1">
+                    <span className="text-[11px] font-medium text-slate-700 truncate">{p.displayName}</span>
+                    {selected && <Check className="w-3.5 h-3.5 text-white bg-violet-600 rounded-full p-0.5 shrink-0" aria-hidden="true" />}
+                  </span>
+                  <span className="flex items-center justify-center bg-[#6b7280] px-1 py-2.5 min-h-[62px]">
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        backgroundColor: p.highlight === 'line' ? p.highlightCss : undefined,
+                        padding: p.highlight === 'line' ? '2px 6px' : 0,
+                        borderRadius: 3,
+                      }}
+                    >
+                      <span style={cardLineStyle(p, 0)}>{p.sample[0]}</span>
+                      {p.sample[1] && <span style={cardLineStyle(p, 1)}>{p.sample[1]}</span>}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Bottom controls — Font Size / Font Color / Caption Position */}
+          <div className="grid grid-cols-3 gap-3 pt-1">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <label htmlFor="caption-font-size" className="font-medium text-slate-600">
+                  Font Size
+                </label>
+                <span className="font-mono tabular-nums text-violet-700 font-semibold">{displayFontSize}px</span>
+              </div>
+              <input
+                id="caption-font-size"
+                type="range"
+                min={20}
+                max={72}
+                step={1}
+                value={Math.min(displayFontSize, 72)}
+                onChange={(e) => onCaptionOverridesChange({ ...captionOverrides, fontSize: Number(e.target.value) })}
+                className="w-full accent-violet-600 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>20</span>
+                <span>72</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <label htmlFor="caption-font-color" className="font-medium text-slate-600">
+                  Font Color
+                </label>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="caption-font-color"
+                  type="color"
+                  value={fontColourCss}
+                  onChange={(e) => onCaptionOverridesChange({ ...captionOverrides, fontColour: e.target.value.toUpperCase() })}
+                  className="w-7 h-7 p-0.5 rounded-full border border-slate-300 bg-white cursor-pointer shrink-0"
+                  aria-label="Caption font color picker"
+                />
+                <input
+                  type="text"
+                  value={fontColourCss}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                      onCaptionOverridesChange({ ...captionOverrides, fontColour: v.toUpperCase() });
+                    }
+                  }}
+                  className="w-full min-w-0 h-7 px-1.5 text-xs font-mono text-slate-900 bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-violet-600"
+                  aria-label="Caption font color hex"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <label htmlFor="caption-position" className="font-medium text-slate-600">
+                  Caption Position
+                </label>
+                <span className="font-mono tabular-nums text-violet-700 font-semibold">{positionPct}%</span>
+              </div>
+              <input
+                id="caption-position"
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={positionPct}
+                onChange={(e) => onCaptionOverridesChange({ ...captionOverrides, positionPct: Number(e.target.value) })}
+                className="w-full accent-violet-600 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>0%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          </div>
+          {(captionOverrides.fontSize !== undefined ||
+            captionOverrides.fontColour !== undefined ||
+            captionOverrides.positionPct !== undefined) && (
+            <button
+              type="button"
+              onClick={() => onCaptionOverridesChange({})}
+              className="text-xs font-medium text-violet-700 hover:text-violet-900 underline underline-offset-2 cursor-pointer"
+            >
+              Reset style overrides
+            </button>
+          )}
         </div>
 
         {/* MediaPipe Face-Track Crop X Offset (for face-track mode) */}

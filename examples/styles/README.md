@@ -1,5 +1,12 @@
 # Caption styles — showcase clips
 
+> **v8.8 (2026-11-17):** the app now ships **18 caption styles** (table below),
+> each with its own font, accent colour, highlight and motion — no two share
+> a motion or an accent colour. The folders below are the **v8.7 showcase**
+> (8 styles, including retired `doac`); they are being refreshed to the
+> v8.8 set. Verified v8.8 renders live in `~/workspace/regression-v88/`
+> (19 renders: 18 styles + 1 override proof).
+
 Eight caption styles, each rendered from a real YouTube moment at 720p,
 ~30 seconds, 9:16. Every clip below was verified frame by frame (captions
 visible, right colour and position, no overlaps, no text over faces) and
@@ -27,3 +34,35 @@ All eight styles are implemented in `src/lib/virality.ts`
 (`CAPTION_STYLE_PRESETS` + `generateAssSubtitle`). The `doac` style uses
 its own `generateDoacSubtitle` (below-picture captions) and the per-scene
 `decideDoacShotLayout` (4:5 crop for singles, 16:9 letterbox for two-shots).
+
+## The v8.8 set — 18 styles (in the app now)
+
+| Style | Font | Accent | Highlight | Motion |
+|---|---|---|---|---|
+| Hormozi V1 | Anton 72 | #FF2D2D red | karaoke (red current word) | pop |
+| Red Line | Anton 68 | #E11D48 rose | wordbox (rose box) | wordbox |
+| Undercut | Playfair Display Italic 58 | #FFD800 yellow | karaoke italic serif | sweep |
+| Streamline | Anton 68 | #7C3AED purple | wordbox (purple box) | wordbox-slide |
+| Hormozi Short 2026-A | Bebas Neue 64 | #FFFFFF white | karaoke tall narrow | slide-up |
+| Hormozi Short 2026-B | Anton 72 | #FFB020 amber | karaoke glow | pulse |
+| Hormozi Short 2026-C | Montserrat ExtraBold 40 | #2DD4BF teal | karaoke small | fade |
+| Hormozi Short 2026-D | Bebas Neue 110 | #3B82F6 blue | flash, middle-centre | spin |
+| Hormozi Short 2026-E | Anton 72 | #4ADE80 light green | karaoke glow | pulse-glow |
+| MrBeast | Anton 76 | #F97316 orange | karaoke, pop-big | pop-big |
+| Iman-A | Montserrat 56 | #94A3B8 slate | karaoke | slide-down |
+| Cardone-A | Anton 72 | #7F1D1D maroon | outline | bounce |
+| Hollywood Fill | Anton 72 | #1E3A8A navy | outline | flip |
+| Roman | Anton 68 | #C2410C burnt orange | wordbox | wordbox-flip |
+| SARA | Poppins ExtraBold 66 | #EC4899 pink | karaoke glow | bounce-soft |
+| ALI | Montserrat 48 | #6B7280 grey | line-box, sentence mode | typewriter |
+| Axel | Poppins ExtraBold 60 | #15803D dark green | wordbox | wordbox-zoom |
+| YELLOW BURST | Anton 72 | #111827 near-black box + #FDE047 pale-yellow text | line-box | rise |
+
+Deviations from the reference image, forced by the distinctness rule (no two
+styles may share a motion or an accent colour): 2026-C is teal text
+(reference: white); MrBeast is orange (reference: yellow); Red Line is a
+rose box (reference red = Hormozi V1's red); Cardone-A is a dark-maroon
+outline; Hollywood Fill is a dark-blue outline; YELLOW BURST is pale-yellow
+text on a near-black box. Default render style is now `hormozi-v1`.
+`doac` was removed from the preset set in v8.8 (user: "doac ta lagbe na") —
+its sample clip and this folder stay as history.

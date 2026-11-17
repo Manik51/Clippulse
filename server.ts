@@ -9,17 +9,12 @@ import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import {
-  ARCHIVO_BLACK_FONT_PATH,
-  buildDoacBlurFill,
-  buildDoacSceneChain,
   buildSlidingWindows,
   parseCustomTranscriptToSource,
   mergeSceneBoundaries,
   buildGameplayFilter,
   buildFaceTrackCropX,
   buildHookPunchScale,
-  buildHookTitleDrawtext,
-  decideDoacShotLayout,
   extractYoutubeVideoId,
   normalizeClipLengthSec,
   qualityDims,
@@ -398,35 +393,6 @@ async function detectSceneFaces(framePaths: string[]): Promise<Array<number | nu
   }
 }
 
-// ClipPulse v8.2 — per-scene MULTI-face check for the DOAC layout (see
-// scripts/scene_faces_multi.py): every human-scale face per mid-frame as
-// {x, w} (0-100 of frame width), so a two-shot can switch to a 16:9
-// letterbox picture instead of two half faces. Empty arrays on any
-// failure — the caller falls back to the 4:5 crop per scene.
-async function detectSceneFacesMulti(
-  framePaths: string[],
-): Promise<Array<Array<{ x: number; w: number }>>> {
-  const script = path.resolve(__dirname, 'scripts', 'scene_faces_multi.py');
-  if (!fs.existsSync(script) || framePaths.length === 0) {
-    return framePaths.map(() => []);
-  }
-  try {
-    const out = await runProcessCapture('python3', [script, ...framePaths], 90000);
-    const parsed = JSON.parse(out) as Array<Array<[number, number]>>;
-    if (Array.isArray(parsed) && parsed.length === framePaths.length) {
-      return parsed.map((faces) =>
-        Array.isArray(faces)
-          ? faces
-              .filter((f) => Array.isArray(f) && Number.isFinite(f[0]) && Number.isFinite(f[1]))
-              .map((f) => ({ x: f[0], w: f[1] }))
-          : [],
-      );
-    }
-    return framePaths.map(() => []);
-  } catch {
-    return framePaths.map(() => []);
-  }
-}
 
 function isChannelBlocked(channelName: string): boolean {
   const ch = channelName.toLowerCase();
@@ -1668,11 +1634,6 @@ async function startServer() {
     const endSec = Number(req.body?.endSec ?? 60);
     const faceOffsetX = Number(req.body?.faceOffsetX ?? 50);
     const framingMode = typeof req.body?.framingMode === 'string' ? req.body.framingMode : 'face-track';
-    // v8 (DOAC spec): only 'doac' is routed — 'punchy'/'fullframe' helpers
-    // exist in the lib but are not wired to the render route (cancelled
-    // forced-choice build); anything else falls back to v7 behaviour.
-    const editStyle = req.body?.editStyle === 'doac' ? 'doac' : undefined;
-    const hookTitle = typeof req.body?.hookTitle === 'string' ? req.body.hookTitle.trim().slice(0, 60) : '';
     const assContent = typeof req.body?.assContent === 'string' ? req.body.assContent : '';
     const copyrightSafeTransform = req.body?.copyrightSafeTransform !== false;
     const mirrorFlip = req.body?.mirrorFlip === true;
@@ -2027,127 +1988,7 @@ async function startServer() {
         // path when there is one scene, no audio, or detection fails.
         // v8: `usedScenes` lives at the outer scope now (see above) so
         // the -af guard after this block can read it.
-        if (editStyle === 'doac') {
-          // v8 — DOAC spec (measured from the reference Short): blur-fill
-          // layout, static framing, voice polish with NO pitch trick
-          // (natural voice), NO SFX, NO music. The source's own camera
-          // cuts do all the changing — no face track, no zoom.
-          const titleFilter = hookTitle
-            ? `,${buildHookTitleDrawtext(hookTitle, targetW, targetH, 2.8, {
-                fontfile: ARCHIVO_BLACK_FONT_PATH,
-                boxed: false,
-                fontcolor: '0xFFD800',
-              })}`
-            : '';
-          // v8.2 — per-shot picture aspect. The reference is single-speaker
-          // close-ups, so its 4:5 crop never meets a two-shot; our source
-          // does, and the 4:5 centre crop cut both faces at the edges in
-          // the first sample. A scene whose faces do not fit the 4:5
-          // window gets a 16:9 letterbox picture (720x405) centred between
-          // the blur bars; everything else keeps the 4:5 crop. Falls back
-          // to the whole-clip 4:5 path when there is no audio, scene
-          // detection fails, or anything throws — and per scene to 4:5
-          // when that scene's faces are unreliable.
-          let doacDone = false;
-          if (hasAudioStream) {
-            try {
-              const sceneSource = isRealUpload ? sourceVideoPath : rawClip;
-              const sceneDuration = await probeDuration(sceneSource);
-              const rawScenes = sceneDuration > 0 ? await detectScenes(sceneSource, sceneDuration) : [];
-              const pairs = rawScenes
-                .map((s) => ({
-                  src: s,
-                  in: isRealUpload
-                    ? { startSec: Math.max(0, s.startSec - safeStart), endSec: Math.min(clipDuration, s.endSec - safeStart) }
-                    : { startSec: s.startSec, endSec: s.endSec },
-                }))
-                .filter((p) => p.in.endSec - p.in.startSec >= 0.5);
-              if (pairs.length >= 1) {
-                const framePaths: string[] = [];
-                for (let idx = 0; idx < pairs.length; idx++) {
-                  const mid = (pairs[idx].src.startSec + pairs[idx].src.endSec) / 2;
-                  const fp = path.join(workDir, `doac-scene-${idx}.jpg`);
-                  await runProcess(
-                    'ffmpeg',
-                    ['-y', '-v', 'error', '-ss', String(mid), '-i', sceneSource, '-frames:v', '1', '-q:v', '3', fp],
-                    workDir,
-                  );
-                  framePaths.push(fp);
-                }
-                const multiFaces = await detectSceneFacesMulti(framePaths);
-                const { width: srcW, height: srcH } = await probeDimensions(sceneSource);
-                const aspect = srcW > 0 && srcH > 0 ? srcW / srcH : 16 / 9;
-                const layouts = pairs.map((_, i) => decideDoacShotLayout(multiFaces[i] ?? [], aspect));
-                const vChains = pairs.map((p, i) =>
-                  buildDoacSceneChain(i, p.in.startSec, p.in.endSec, layouts[i], targetW, targetH),
-                );
-                const aChains: string[] = [];
-                const concatInputs: string[] = [];
-                pairs.forEach((p, i) => {
-                  const segDur = (p.in.endSec - p.in.startSec).toFixed(2);
-                  aChains.push(
-                    `[0:a]atrim=start=${p.in.startSec}:end=${p.in.endSec},asetpts=PTS-STARTPTS,apad=whole_dur=${segDur}[da${i}]`,
-                  );
-                  concatInputs.push(`[v${i}][da${i}]`);
-                });
-                // Post-concat chain: join the non-empty filters with commas
-                // (a leading comma after [vc] is an empty filter and ffmpeg
-                // rejects it — build the list instead of concatenating).
-                const postFilters: string[] = [];
-                const vt = visualTransform.replace(/^,/, '');
-                if (vt) postFilters.push(vt);
-                if (titleFilter) postFilters.push(titleFilter.replace(/^,/, ''));
-                if (assFilter) postFilters.push(assFilter.replace(/^,/, ''));
-                postFilters.push('format=yuv420p');
-                ffmpegArgs.push(
-                  '-filter_complex',
-                  `${vChains.join(';')};${aChains.join(';')};${concatInputs.join('')}concat=n=${pairs.length}:v=1:a=1[vc][ac];[ac]${VOICE_POLISH_FILTER}[aout];[vc]${postFilters.join(',')}[v]`,
-                  '-map',
-                  '[v]',
-                  '-map',
-                  '[aout]',
-                );
-                sceneInfo = pairs.map((p, i) => ({
-                  startSec: p.in.startSec,
-                  endSec: p.in.endSec,
-                  faceX: multiFaces[i]?.[0]?.x ?? null,
-                  layout: layouts[i] === 'letterbox169' ? 'doac-letterbox' : 'doac-crop45',
-                }));
-                sceneAware = false;
-                usedScenes = true;
-                sfxUsed = false;
-                doacDone = true;
-              }
-            } catch {
-              // Fall through to the whole-clip path below.
-            }
-          }
-          if (!doacDone) {
-            if (hasAudioStream) {
-              ffmpegArgs.push(
-                '-filter_complex',
-                `${buildDoacBlurFill(targetW, targetH)}${visualTransform}${titleFilter}${assFilter},format=yuv420p[v];[0:a]${VOICE_POLISH_FILTER}[aout]`,
-                '-map',
-                '[v]',
-                '-map',
-                '[aout]',
-              );
-            } else {
-              ffmpegArgs.push(
-                '-filter_complex',
-                `${buildDoacBlurFill(targetW, targetH)}${visualTransform}${titleFilter}${assFilter},format=yuv420p[v]`,
-                '-map',
-                '[v]',
-                '-map',
-                audioMap,
-              );
-            }
-            sceneInfo = [{ startSec: 0, endSec: clipDuration, faceX: null, layout: 'doac-blurfill' }];
-            sceneAware = false;
-            usedScenes = true;
-            sfxUsed = false;
-          }
-        } else if (hasAudioStream) {
+        if (hasAudioStream) {
           try {
             // Uploads render from the uploaded file (rawClip never exists
             // for them); YouTube sections render from the downloaded
@@ -2275,7 +2116,7 @@ async function startServer() {
       // v7: voice polish on the single-filter path too (was loudnorm-only
       // and copyright-safe-only). The pitch trick stays copyright-only.
       // v8: skip when a filter_complex branch already polished the audio
-      // (doac, sports-blur and gaming-split all set usedScenes) — -af
+      // (sports-blur and gaming-split set usedScenes) — -af
       // beside -filter_complex is rejected by ffmpeg.
       if (hasAudioStream && !sceneAware && !usedScenes) {
         const pitchTrick = copyrightSafeTransform
@@ -2327,7 +2168,6 @@ async function startServer() {
         sceneAware,
         scenes: sceneInfo,
         sfxUsed,
-        editStyle: editStyle ?? null,
         facecam: facecam
           ? {
               corner: facecam.corner,

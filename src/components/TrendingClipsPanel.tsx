@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Download, Flame, Play, RefreshCw, TrendingUp } from 'lucide-react';
 import { generateAssSubtitle, extractYoutubeVideoId, CLIP_LENGTH_PRESETS, normalizeClipLengthSec } from '../lib/virality';
-import type { FramingMode, TranscriptSegment } from '../lib/types';
+import type { CaptionOverrides, CaptionStyle, FramingMode, TranscriptSegment } from '../lib/types';
 
 /**
  * ClipPulse v6 — Trending Clips: the simple flow Manik asked for.
@@ -120,7 +120,19 @@ async function pollJob(jobId: string, timeoutMs = 30 * 60 * 1000): Promise<Recor
   }
 }
 
-export const TrendingClipsPanel: React.FC = () => {
+interface TrendingClipsPanelProps {
+  /** Caption style picked in the workbench gallery — this is what the
+   * 4 clips actually render with (v8.8: the old code hardcoded 'karaoke'
+   * here, so the picker never reached a render). */
+  captionStyle?: CaptionStyle;
+  /** Gallery-picker overrides (font size / colour / position). */
+  captionOverrides?: CaptionOverrides;
+}
+
+export const TrendingClipsPanel: React.FC<TrendingClipsPanelProps> = ({
+  captionStyle = 'hormozi-v1',
+  captionOverrides = {},
+}) => {
   const [stage, setStage] = useState<'idle' | 'loading' | 'channels' | 'analyzing' | 'ready'>('idle');
   const [channels, setChannels] = useState<TrendChannel[]>([]);
   const [selectedHandle, setSelectedHandle] = useState<string>('');
@@ -198,7 +210,19 @@ export const TrendingClipsPanel: React.FC = () => {
     setClips((prev) => prev.map((c, i) => (i === index ? { ...c, status: 'rendering', error: '' } : c)));
     try {
       const hook = win.suggestedHooks?.[0] || '';
-      const assContent = generateAssSubtitle(segments, win.startSec, win.endSec, hook, 'karaoke', undefined, true);
+      // v8.8 — the picked gallery style + overrides are what renders
+      // (the old code hardcoded 'karaoke' here).
+      const assContent = generateAssSubtitle(
+        segments,
+        win.startSec,
+        win.endSec,
+        hook,
+        captionStyle,
+        undefined,
+        true,
+        undefined,
+        captionOverrides
+      );
       const res = await fetch('/api/render-local-mp4', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

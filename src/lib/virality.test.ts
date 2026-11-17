@@ -1,34 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   CAPTION_STYLE_PRESETS,
   CATEGORY_WEIGHTS,
   DEFAULT_WEIGHTS,
   buildAutoFetchPack,
-  buildDoacBlurFill,
-  buildDoacSceneChain,
   buildFaceTrackCropX,
   buildFfmpegCommand,
   buildHookPunchScale,
-  buildHookTitleDrawtext,
   buildPushInScale,
   buildSlidingWindows,
   buildUploadedVideoSource,
   buildZoomPunchScale,
   calculateWeightedScore,
-  decideDoacShotLayout,
-  doacFgHeight,
   evaluateCopyrightSafety,
   extractWordsFromSegments,
   extractYoutubeVideoId,
   escapeDrawtext,
   formatAssTimecode,
   formatTimecode,
+  applyCaptionOverrides,
+  assColourToCss,
   generateAssSubtitle,
-  generateDoacSubtitle,
+  hexToAssColour,
+  marginVForPositionPct,
+  positionPctForPreset,
   mergeSceneBoundaries,
   buildGameplayFilter,
-  measureTitleWidthEm,
   normalizeClipLengthSec,
   pickPunchTimes,
   qualityDims,
@@ -101,7 +102,7 @@ test('generateAssSubtitle produces valid ASS karaoke events, hook banner, and CC
     30,
     90,
     '22 needed off 6 balls!',
-    'karaoke',
+    'hormozi-v1',
     'CC-BY: Metro Sports Commons'
   );
   assert.ok(ass.includes('[Script Info]'));
@@ -125,11 +126,12 @@ test('v7.2 extractYoutubeVideoId reads watch, short, live, embed and bare ids', 
   assert.equal(extractYoutubeVideoId('https://example.com/watch?v=sRH-XlBE2cQ'), null);
 });
 
-test('Hormozi karaoke: Anton, ALL CAPS, black outline, word pop transforms', () => {
+test('Hormozi V1: Anton, ALL CAPS, red highlight, word pop transforms', () => {
   const cricket = PRESET_VIDEOS.find((p) => p.category === 'cricket')!;
-  const ass = generateAssSubtitle(cricket.segments, 30, 90, '', 'karaoke');
+  const ass = generateAssSubtitle(cricket.segments, 30, 90, '', 'hormozi-v1');
   const styleLine = ass.split('\n').find((l) => l.startsWith('Style: Karaoke,'));
   assert.ok(styleLine?.includes('Anton,72,'), styleLine);
+  assert.ok(styleLine?.includes('&H002D2DFF'), styleLine); // red #FF2D2D highlight (ASS &H00BBGGRR)
   assert.ok(styleLine?.includes(',&H00000000,'), styleLine);
   // No lowercase word text survives in karaoke dialogue lines.
   const dialogue = ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
@@ -293,7 +295,7 @@ test('v7.1 ASS never shows two subtitle lines at once from overlapping words', (
       { word: 'say,', start: 1441.2, end: 1441.6 },
     ] },
   ];
-  const ass = generateAssSubtitle(overlapping as any, 1440, 1470, '', 'karaoke');
+  const ass = generateAssSubtitle(overlapping as any, 1440, 1470, '', 'mrbeast');
   const events = ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
   assert.ok(events.length > 0);
   const times = events.map((l) => {
@@ -402,206 +404,207 @@ test('v8 escapeDrawtext escapes colon, quote, comma, backslash', () => {
   assert.equal(escapeDrawtext('a\\b'), 'a\\\\b');
 });
 
-test('v8 buildHookTitleDrawtext defaults to Anton + box, DOAC opts drop the box', () => {
-  const def = buildHookTitleDrawtext('Leader of Al-Qaeda', 720, 1280);
-  assert.ok(def.includes('fontfile=/home/hatch/.fonts/Anton-Regular.ttf'));
-  assert.ok(def.includes('box=1'));
-  assert.ok(def.includes('fontcolor=white'));
-  assert.ok(def.includes("enable='between(t\\,0\\,2.5)'"));
-  const doac = buildHookTitleDrawtext('A Soviet Grocery Store Had Only 77 Items', 720, 1280, 2.8, {
-    fontfile: '/home/hatch/.fonts/ArchivoBlack-Regular.ttf',
-    boxed: false,
-    fontcolor: '0xFFD800',
-  });
-  assert.ok(doac.includes('fontfile=/home/hatch/.fonts/ArchivoBlack-Regular.ttf'));
-  assert.ok(!doac.includes('box=1'));
-  assert.ok(doac.includes('fontcolor=0xFFD800'));
-  assert.equal(buildHookTitleDrawtext('   ', 720, 1280), '');
-});
 
-test('v8.1 title width matches measured Archivo Black metrics (1089px at 63px)', () => {
-  assert.ok(Math.abs(measureTitleWidthEm('OF SEAL TEAM 6 WOULD COME', 'archivo') - 17.275) < 0.01);
-  // 17.275em x 63px = 1088px on a 720px frame: the v8 sample overflowed.
-  assert.ok(measureTitleWidthEm('OF SEAL TEAM 6 WOULD COME', 'archivo') * 63 > 720);
-  // Same words in condensed Anton fit on one line.
-  assert.ok(measureTitleWidthEm('LEADER OF AL-QAEDA', 'anton') * 63 <= 660);
-});
 
-test('v8.1 buildHookTitleDrawtext wraps long titles to two fitting lines', () => {
-  const doacOpts = {
-    fontfile: '/home/hatch/.fonts/ArchivoBlack-Regular.ttf',
-    boxed: false,
-    fontcolor: '0xFFD800',
-  };
-  const frag = buildHookTitleDrawtext('Of SEAL Team 6 would come', 720, 1280, 2.8, doacOpts);
-  assert.equal((frag.match(/drawtext=/g) || []).length, 2);
-  assert.ok(frag.includes('OF SEAL TEAM'));
-  assert.ok(frag.includes('6 WOULD COME'));
-  assert.ok(frag.includes('fontsize=63'));
-  const mission = buildHookTitleDrawtext('The super secret mission', 720, 1280, 2.8, doacOpts);
-  assert.equal((mission.match(/drawtext=/g) || []).length, 2);
-  assert.ok(mission.includes('THE SUPER'));
-  assert.ok(mission.includes('SECRET MISSION'));
-  // The reference title itself needs a shrink: 1694px at 63px -> two 43px lines.
-  const ref = buildHookTitleDrawtext('A Soviet Grocery Store Had Only 77 Items', 720, 1280, 2.8, doacOpts);
-  assert.equal((ref.match(/drawtext=/g) || []).length, 2);
-  assert.ok(ref.includes('fontsize=43'));
-  assert.ok(ref.includes('A SOVIET GROCERY STORE'));
-  assert.ok(ref.includes('HAD ONLY 77 ITEMS'));
-  // Short Anton title stays a single drawtext, as before.
-  const short = buildHookTitleDrawtext('Leader of Al-Qaeda', 720, 1280);
-  assert.equal((short.match(/drawtext=/g) || []).length, 1);
-});
 
-test('v8 generateAssSubtitle popScale parameter (118 default, 130 punchy)', () => {
+test('v8 generateAssSubtitle popScale parameter (118 Hormozi V1, 140 MrBeast pop-big, 130 override)', () => {
   const segs = [{ start: 85, end: 88, text: 'Leader of Al-Qaeda.', words: [
     { word: 'Leader', start: 85, end: 85.4 },
     { word: 'of', start: 85.4, end: 85.6 },
     { word: 'Al-Qaeda.', start: 85.6, end: 86.1 },
   ] }] as any;
-  const def = generateAssSubtitle(segs, 85, 115, '', 'karaoke');
-  assert.ok(def.includes('fscx118'));
-  const pop = generateAssSubtitle(segs, 85, 115, '', 'karaoke', undefined, true, 130);
+  const hv1 = generateAssSubtitle(segs, 85, 115, '', 'hormozi-v1');
+  assert.ok(hv1.includes('fscx118'));
+  const def = generateAssSubtitle(segs, 85, 115, '', 'mrbeast');
+  assert.ok(def.includes('fscx140'));
+  const pop = generateAssSubtitle(segs, 85, 115, '', 'mrbeast', undefined, true, 130);
   assert.ok(pop.includes('fscx130'));
-  assert.ok(!pop.includes('fscx118'));
+  assert.ok(!pop.includes('fscx140'));
 });
 
-test('v8.7 caption styles: seven distinct designs, real installed fonts, own motion each', () => {
-  const segs = [{ start: 85, end: 88, text: 'Leader of Al-Qaeda.', words: [
-    { word: 'Leader', start: 85, end: 85.4 },
-    { word: 'of', start: 85.4, end: 85.6 },
-    { word: 'Al-Qaeda.', start: 85.6, end: 86.1 },
-  ] }] as any;
-  const styleLine = (ass: string) => ass.split('\n').find((l) => l.startsWith('Style: Karaoke,'))!;
-  const wordEvents = (ass: string) => ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
-  // Hormozi stays Anton yellow with pop.
-  assert.ok(styleLine(generateAssSubtitle(segs, 85, 115, '', 'karaoke')).includes('Anton,72,'));
-  // Minimal is Montserrat ExtraBold 40pt, bottom-LEFT, fades in (no scale pop).
-  const minimal = generateAssSubtitle(segs, 85, 115, '', 'minimal');
-  assert.ok(styleLine(minimal).includes('Montserrat ExtraBold,40,'));
-  assert.ok(styleLine(minimal).includes(',1,1,0,1,60,60,200,1'));
-  assert.ok(wordEvents(minimal).length > 0);
-  assert.ok(wordEvents(minimal).every((l) => !l.includes('fscx')));
-  assert.ok(wordEvents(minimal).every((l) => l.includes('\\1a&HFF&')));
-  // Bold is Alfa Slab One on a solid yellow box, one word per event.
-  // (libass draws the BorderStyle=3 box from the OUTLINE colour, not
-  // BackColour — outline must be yellow too, or the box comes out black.)
-  const bold = generateAssSubtitle(segs, 85, 115, '', 'bold');
-  assert.ok(styleLine(bold).includes('Alfa Slab One,64,'));
-  assert.ok(styleLine(bold).includes(',3,6,0,2,60,60,340,1'));
-  assert.ok(styleLine(bold).includes('&H00404040,&H0000D7FF,&H0000D7FF,'));
-  assert.equal(wordEvents(bold).length, 3);
-  // Lime: Poppins ExtraBold, lime highlight, glow pulse (blur decay, no scale pop).
-  const lime = generateAssSubtitle(segs, 85, 115, '', 'lime');
-  assert.ok(styleLine(lime).includes('Poppins ExtraBold,66,'));
-  assert.ok(styleLine(lime).includes('&H0035F1C6'));
-  assert.ok(wordEvents(lime).every((l) => l.includes('\\blur4')));
-  assert.ok(wordEvents(lime).every((l) => !l.includes('fscx')));
-  // Sentence: opaque-box style, one event per segment, typewriter \kf reveal.
-  const sentence = generateAssSubtitle(segs, 85, 115, '', 'sentence');
-  assert.ok(styleLine(sentence).includes('Noto Sans,46,'));
-  assert.ok(styleLine(sentence).includes(',3,2,0,2,60,60,260,1'));
-  assert.ok(sentence.includes('Leader'));
-  assert.ok(sentence.includes('Al-Qaeda.'));
-  assert.ok(sentence.includes('\\kf'));
-  // Top: Lilita One at the top, flips in (no scale pop).
-  const top = generateAssSubtitle(segs, 85, 115, '', 'top');
-  assert.ok(styleLine(top).includes('Lilita One,56,'));
-  assert.ok(styleLine(top).includes(',1,4,0,8,60,60,150,1'));
-  assert.ok(wordEvents(top).every((l) => l.includes('\\fry80')));
-  assert.ok(wordEvents(top).every((l) => !l.includes('fscx')));
-  // Word Flash: Bebas Neue 130pt, middle-centre, white with a red outline, bounces in.
-  const flash = generateAssSubtitle(segs, 85, 115, '', 'flash');
-  assert.ok(styleLine(flash).includes('Bebas Neue,130,'));
-  assert.ok(styleLine(flash).includes(',1,6,0,5,60,60,0,1'));
-  assert.ok(styleLine(flash).includes('&H00FFFFFF'));
-  assert.ok(styleLine(flash).includes('&H000000FF'));
-  assert.ok(wordEvents(flash).every((l) => l.includes('fscx150')));
-  assert.equal(wordEvents(flash).length, 3);
-});
+const V88_SEGS = [{ start: 85, end: 88, text: 'Leader of Al-Qaeda.', words: [
+  { word: 'Leader', start: 85, end: 85.4 },
+  { word: 'of', start: 85.4, end: 85.6 },
+  { word: 'Al-Qaeda.', start: 85.6, end: 86.1 },
+] }] as any;
+const v88StyleLine = (ass: string) => ass.split('\n').find((l) => l.startsWith('Style: Karaoke,'))!;
+const v88Dialogue = (ass: string) => ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
+const V88_STYLES = [
+  'hormozi-v1', 'red-line', 'undercut', 'streamline',
+  'hormozi-2026-a', 'hormozi-2026-b', 'hormozi-2026-c', 'hormozi-2026-d', 'hormozi-2026-e',
+  'mrbeast', 'iman-a', 'cardone-a', 'hollywood-fill', 'roman', 'sara', 'ali', 'axel', 'yellow-burst',
+] as const;
 
-test('v8.7 caption styles are mutually distinct: font, motion, position', () => {
-  const styles = Object.keys(CAPTION_STYLE_PRESETS) as CaptionStyle[];
-  assert.equal(styles.length, 7);
-  const fonts = styles.map((s) => CAPTION_STYLE_PRESETS[s].font);
-  assert.equal(new Set(fonts).size, 7);
-  const motions = styles.map((s) => CAPTION_STYLE_PRESETS[s].motion);
-  assert.equal(new Set(motions).size, 7);
-  // Positions: minimal bottom-left, top top-centre, flash middle-centre, rest bottom-centre.
-  assert.equal(CAPTION_STYLE_PRESETS.minimal.alignment, 1);
-  assert.equal(CAPTION_STYLE_PRESETS.top.alignment, 8);
-  assert.equal(CAPTION_STYLE_PRESETS.flash.alignment, 5);
-  // No two styles share the same (font, alignment, fontSize) triple.
-  const triples = styles.map((s) => {
+test('v8.8 preset set: exactly the 18 reference styles, no doac', () => {
+  const styles = Object.keys(CAPTION_STYLE_PRESETS);
+  assert.deepEqual([...styles].sort(), [...V88_STYLES].sort());
+  assert.equal(styles.length, 18);
+  assert.ok(!('doac' in CAPTION_STYLE_PRESETS));
+  const displayNames: Record<string, string> = {
+    'hormozi-v1': 'Hormozi V1', 'red-line': 'Red Line', undercut: 'Undercut', streamline: 'Streamline',
+    'hormozi-2026-a': 'Hormozi Short 2026 - A', 'hormozi-2026-b': 'Hormozi Short 2026 - B',
+    'hormozi-2026-c': 'Hormozi Short 2026 - C', 'hormozi-2026-d': 'Hormozi Short 2026 - D',
+    'hormozi-2026-e': 'Hormozi Short 2026 - E', mrbeast: 'MrBeast', 'iman-a': 'Iman - A',
+    'cardone-a': 'Cardone - A', 'hollywood-fill': 'Hollywood Fill', roman: 'Roman',
+    sara: 'SARA', ali: 'ALI', axel: 'Axel', 'yellow-burst': 'YELLOW BURST',
+  };
+  for (const s of V88_STYLES) {
     const p = CAPTION_STYLE_PRESETS[s];
-    return `${p.font}|${p.alignment}|${p.fontSize}`;
-  });
-  assert.equal(new Set(triples).size, 7);
+    assert.equal(p.displayName, displayNames[s], s);
+    assert.ok(p.sample[0].length > 0, s);
+    assert.match(p.accentColour, /^#[0-9A-F]{6}$/, s);
+    assert.ok(['none', 'word', 'line', 'glow'].includes(p.highlight), s);
+  }
 });
 
-test('v8 buildDoacBlurFill is a 4:5 centre crop on a blurred 9:16 fill', () => {
-  const f720 = buildDoacBlurFill(720, 1280);
-  assert.ok(f720.includes('boxblur=16:3[bg]'));
-  assert.ok(f720.includes('crop=ih*4/5:ih:(iw-ih*4/5)/2:0'));
-  assert.ok(f720.includes('scale=720:900'));
-  assert.ok(f720.includes('[bg][fg]overlay=(W-w)/2:(H-h)/2'));
-  const f1080 = buildDoacBlurFill(1080, 1920);
-  assert.ok(f1080.includes('scale=1080:1350'));
+test('v8.8 motions: all 18 pairwise distinct, each renders its own tag', () => {
+  const styles = Object.keys(CAPTION_STYLE_PRESETS) as CaptionStyle[];
+  const motions = styles.map((s) => CAPTION_STYLE_PRESETS[s].motion);
+  assert.equal(new Set(motions).size, 18, `motions must be pairwise distinct, got: ${motions.join(',')}`);
+  // Each motion's tag is a different ASS transform (checked on the
+  // Dialogue lines of a real generated ASS, not on the preset record).
+  const marker: Record<string, (d: string[]) => boolean> = {
+    pop: (d) => d.some((l) => l.includes('\\fscx118\\fscy118')),
+    'pop-big': (d) => d.some((l) => l.includes('\\fscx140\\fscy140')),
+    wordbox: (d) => d.some((l) => l.includes('\\fscx115\\fscy115')),
+    'wordbox-slide': (d) => d.some((l) => l.includes('\\fscx80') && !l.includes('\\fscy60')),
+    'wordbox-flip': (d) => d.some((l) => l.includes('\\fry70')),
+    'wordbox-zoom': (d) => d.some((l) => l.includes('\\fscx50\\fscy50')),
+    sweep: (d) => d.length > 0 && d.every((l) => l.includes('\\kf') && !l.includes('\\t(')),
+    'slide-up': (d) => d.some((l) => l.includes('\\fscx80\\fscy60')),
+    'slide-down': (d) => d.some((l) => l.includes('\\fscy140')),
+    rise: (d) => d.some((l) => l.includes('\\fscy50')),
+    pulse: (d) => d.some((l) => l.includes('\\blur4')),
+    'pulse-glow': (d) => d.some((l) => l.includes('\\blur6') && l.includes('\\bord6')),
+    fade: (d) => d.some((l) => l.includes('\\1a&HFF&\\t(0,150,\\1a&H00&)')),
+    spin: (d) => d.some((l) => l.includes('\\frz90')),
+    bounce: (d) => d.some((l) => l.includes('\\fscx150\\fscy150')),
+    'bounce-soft': (d) => d.some((l) => l.includes('\\fscx125\\fscy125')),
+    flip: (d) => d.some((l) => l.includes('\\fry80')),
+    typewriter: (d) => d.some((l) => l.includes('\\1a&HFF&\\t(') && l.includes(',1,\\1a&H00&)')),
+  };
+  for (const s of styles) {
+    const p = CAPTION_STYLE_PRESETS[s];
+    const dialogue = v88Dialogue(generateAssSubtitle(V88_SEGS, 85, 115, '', s));
+    assert.ok(dialogue.length > 0, `${s} renders dialogue`);
+    assert.ok(marker[p.motion](dialogue), `${s} motion ${p.motion} must render its own tag`);
+  }
 });
 
-test('v8.2 decideDoacShotLayout: two far-apart faces -> letterbox, single/close faces -> 4:5 crop', () => {
-  // Measured on the Raj 800-830 source: two-shot faces at ~26% and ~77%
-  // (w ~11) fall outside the centred 4:5 window [27.5, 72.5] of a 16:9 frame.
-  assert.equal(decideDoacShotLayout([{ x: 26.2, w: 11.1 }, { x: 77.2, w: 11.1 }], 16 / 9), 'letterbox169');
-  assert.equal(decideDoacShotLayout([{ x: 74.0, w: 11.4 }, { x: 26.5, w: 11.0 }], 16 / 9), 'letterbox169');
-  // Single centred face fits the 4:5 window.
-  assert.equal(decideDoacShotLayout([{ x: 53.6, w: 13.4 }], 16 / 9), 'crop45');
-  assert.equal(decideDoacShotLayout([{ x: 55.6, w: 11.1 }], 16 / 9), 'crop45');
-  // Two faces close together fit.
-  assert.equal(decideDoacShotLayout([{ x: 45, w: 10 }, { x: 55, w: 10 }], 16 / 9), 'crop45');
-  // No faces / unusable aspect fall back to the 4:5 crop.
-  assert.equal(decideDoacShotLayout([], 16 / 9), 'crop45');
-  assert.equal(decideDoacShotLayout([{ x: 26, w: 11 }, { x: 77, w: 11 }], Number.NaN), 'crop45');
-  // One face at the extreme edge is cut by the centred crop -> letterbox.
-  assert.equal(decideDoacShotLayout([{ x: 8, w: 12 }], 16 / 9), 'letterbox169');
-  // A squarer source has a wider 4:5 window, so the same pair fits.
-  assert.equal(decideDoacShotLayout([{ x: 26, w: 11 }, { x: 77, w: 11 }], 1.0), 'crop45');
+test('v8.8 accent colours: all 18 pairwise distinct and each one really renders', () => {
+  const styles = Object.keys(CAPTION_STYLE_PRESETS) as CaptionStyle[];
+  const accents = styles.map((s) => CAPTION_STYLE_PRESETS[s].accentColour);
+  assert.equal(new Set(accents).size, 18, `accents must be pairwise distinct, got: ${accents.join(',')}`);
+  for (const s of styles) {
+    const p = CAPTION_STYLE_PRESETS[s];
+    const ass = generateAssSubtitle(V88_SEGS, 85, 115, '', s);
+    // The accent's BBGGRR digits must appear in the style's own ASS
+    // Style line (as primary, secondary, outline or box colour) —
+    // an accent that only lives in metadata would fail this.
+    const bbgrr = hexToAssColour(p.accentColour)!.slice(4);
+    assert.ok(v88StyleLine(ass).includes(bbgrr), `${s} accent ${p.accentColour} must render (BBGGRR ${bbgrr})`);
+  }
 });
 
-test('v8.2 buildDoacSceneChain: letterbox is 720x405, crop45 is the 4:5 chain', () => {
-  assert.equal(doacFgHeight(720, 'crop45'), 900);
-  assert.equal(doacFgHeight(720, 'letterbox169'), 405);
-  const crop = buildDoacSceneChain(0, 0, 4.5, 'crop45', 720, 1280);
-  assert.ok(crop.includes('[0:v]trim=start=0.00:end=4.50,setpts=PTS-STARTPTS,split=2[sin0a][sin0b]'));
-  assert.ok(crop.includes('crop=ih*4/5:ih:(iw-ih*4/5)/2:0,scale=720:900'));
-  assert.ok(crop.includes('boxblur=16:3[bg0]'));
-  assert.ok(crop.includes('[bg0][fg0]overlay=(W-w)/2:(H-h)/2,setsar=1[v0]'));
-  const box = buildDoacSceneChain(1, 4.5, 21.94, 'letterbox169', 720, 1280);
-  assert.ok(box.includes('trim=start=4.50:end=21.94'));
-  assert.ok(box.includes('scale=720:405:force_original_aspect_ratio=increase,crop=720:405'));
-  assert.ok(!box.includes('crop=ih*4/5'));
-  // v8.4: setsar=1 on every concat input — the hook punch-in scale and the
-  // plain scale produce different SARs on 720p sources, and concat
-  // rejects mismatched SARs with ffmpeg -22 ("no packets").
-  assert.ok(box.includes('[bg1][fg1]overlay=(W-w)/2:(H-h)/2,setsar=1[v1]'));
+test('v8.8 spot checks: font, size, accent, motion per style', () => {
+  const expected: Record<string, { font: string; size: number; accent: string; motion: string }> = {
+    'hormozi-v1': { font: 'Anton', size: 72, accent: '#FF2D2D', motion: 'pop' },
+    'red-line': { font: 'Anton', size: 68, accent: '#E11D48', motion: 'wordbox' },
+    undercut: { font: 'Playfair Display', size: 58, accent: '#FFD800', motion: 'sweep' },
+    streamline: { font: 'Anton', size: 68, accent: '#7C3AED', motion: 'wordbox-slide' },
+    'hormozi-2026-a': { font: 'Bebas Neue', size: 64, accent: '#FFFFFF', motion: 'slide-up' },
+    'hormozi-2026-b': { font: 'Anton', size: 72, accent: '#FFB020', motion: 'pulse' },
+    'hormozi-2026-c': { font: 'Montserrat ExtraBold', size: 40, accent: '#2DD4BF', motion: 'fade' },
+    'hormozi-2026-d': { font: 'Bebas Neue', size: 110, accent: '#3B82F6', motion: 'spin' },
+    'hormozi-2026-e': { font: 'Anton', size: 72, accent: '#4ADE80', motion: 'pulse-glow' },
+    mrbeast: { font: 'Anton', size: 76, accent: '#F97316', motion: 'pop-big' },
+    'iman-a': { font: 'Montserrat', size: 56, accent: '#94A3B8', motion: 'slide-down' },
+    'cardone-a': { font: 'Anton', size: 72, accent: '#7F1D1D', motion: 'bounce' },
+    'hollywood-fill': { font: 'Anton', size: 72, accent: '#1E3A8A', motion: 'flip' },
+    roman: { font: 'Anton', size: 68, accent: '#C2410C', motion: 'wordbox-flip' },
+    sara: { font: 'Poppins ExtraBold', size: 66, accent: '#EC4899', motion: 'bounce-soft' },
+    ali: { font: 'Montserrat', size: 48, accent: '#6B7280', motion: 'typewriter' },
+    axel: { font: 'Poppins ExtraBold', size: 60, accent: '#15803D', motion: 'wordbox-zoom' },
+    'yellow-burst': { font: 'Anton', size: 72, accent: '#111827', motion: 'rise' },
+  };
+  for (const [style, exp] of Object.entries(expected)) {
+    const p = CAPTION_STYLE_PRESETS[style as CaptionStyle];
+    assert.equal(p.font, exp.font, style);
+    assert.equal(p.fontSize, exp.size, style);
+    assert.equal(p.accentColour, exp.accent, style);
+    assert.equal(p.motion, exp.motion, style);
+  }
+  // Box styles: libass draws the BorderStyle=3 box from the OUTLINE
+  // colour, not BackColour — both fields must carry the box colour.
+  for (const s of ['red-line', 'streamline', 'roman', 'axel'] as CaptionStyle[]) {
+    const p = CAPTION_STYLE_PRESETS[s];
+    assert.equal(p.outlineColour, p.backColour, `${s} box colour in outline AND back`);
+  }
+  // YELLOW BURST's near-black box: same BBGGRR in outline and back.
+  const yb = CAPTION_STYLE_PRESETS['yellow-burst'];
+  assert.ok(yb.outlineColour.endsWith('271811') && yb.backColour.endsWith('271811'));
 });
 
-test('v8 generateDoacSubtitle: Archivo Black, below-picture, highlight only, no extras', () => {
-  const segs = [{ start: 85, end: 88, text: 'Leader of Al-Qaeda.', words: [
-    { word: 'Leader', start: 85, end: 85.4 },
-    { word: 'of', start: 85.4, end: 85.6 },
-    { word: 'Al-Qaeda.', start: 85.6, end: 86.1 },
-  ] }] as any;
-  const ass = generateDoacSubtitle(segs, 85, 115);
-  assert.ok(ass.includes('Style: Doac,Archivo Black,80,&H0000D7FF'));
-  assert.ok(ass.includes(',60,60,160,1'));
-  assert.ok(ass.includes('LEADER'));
-  assert.ok(!ass.includes('\\t('), 'DOAC captions have no pop transforms');
-  assert.ok(!ass.includes('ProgressBar'));
-  assert.ok(!ass.includes('HookBanner'));
-  const events = ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,'));
-  assert.ok(events.length > 0);
+test('v8.8 overrides: font size, colour and position change the rendered ASS', () => {
+  const styleLine = (ass: string) => v88StyleLine(ass);
+  // Default MrBeast: Anton 76, bottom MarginV 340.
+  const def = styleLine(generateAssSubtitle(V88_SEGS, 85, 115, '', 'mrbeast'));
+  assert.ok(def.includes('Anton,76,'), def);
+  assert.ok(def.endsWith(',340,1'), def);
+  // Font size 50.
+  const sized = styleLine(generateAssSubtitle(V88_SEGS, 85, 115, '', 'mrbeast', undefined, true, undefined, { fontSize: 50 }));
+  assert.ok(sized.includes('Anton,50,'), sized);
+  // Font colour green.
+  const coloured = styleLine(generateAssSubtitle(V88_SEGS, 85, 115, '', 'mrbeast', undefined, true, undefined, { fontColour: '#00FF00' }));
+  assert.ok(coloured.includes('&H0000FF00'), coloured);
+  // Position 80% -> MarginV (100-80)*9 = 180.
+  const moved = styleLine(generateAssSubtitle(V88_SEGS, 85, 115, '', 'mrbeast', undefined, true, undefined, { positionPct: 80 }));
+  assert.ok(moved.endsWith(',180,1'), moved);
+  // Invalid colour falls back to the preset's own colour.
+  const bad = styleLine(generateAssSubtitle(V88_SEGS, 85, 115, '', 'mrbeast', undefined, true, undefined, { fontColour: 'not-a-colour' }));
+  assert.ok(bad.includes('&H001673F9'), bad);
 });
+
+test('v8.8 helpers: hex round-trip, marginV mapping, preset positions', () => {
+  assert.equal(hexToAssColour('#FFD800'), '&H0000D8FF');
+  assert.equal(hexToAssColour('#FF2D2D'), '&H002D2DFF');
+  assert.equal(hexToAssColour('zzz'), null);
+  assert.equal(hexToAssColour('#ff2d2d'), '&H002D2DFF');
+  assert.equal(assColourToCss('&H0000D8FF'), '#FFD800');
+  for (const s of Object.keys(CAPTION_STYLE_PRESETS) as CaptionStyle[]) {
+    const a = CAPTION_STYLE_PRESETS[s].accentColour;
+    assert.equal(assColourToCss(hexToAssColour(a)!), a, s);
+  }
+  assert.equal(marginVForPositionPct(0, 2), 900);
+  assert.equal(marginVForPositionPct(100, 2), 0);
+  assert.equal(marginVForPositionPct(50, 2), 450);
+  assert.equal(marginVForPositionPct(0, 8), 0);
+  assert.equal(marginVForPositionPct(100, 8), 200);
+  assert.equal(marginVForPositionPct(50, 8), 100);
+  assert.equal(positionPctForPreset(CAPTION_STYLE_PRESETS['hormozi-v1']), 62);
+  assert.equal(positionPctForPreset(CAPTION_STYLE_PRESETS['hormozi-2026-d']), 100);
+  assert.equal(positionPctForPreset(CAPTION_STYLE_PRESETS.ali), 71);
+});
+
+test('v8.8 fonts: every font a preset names is installed', () => {
+  const FONT_FILES: Record<string, string> = {
+    Anton: 'Anton-Regular.ttf',
+    'Bebas Neue': 'BebasNeue-Regular.ttf',
+    'Montserrat ExtraBold': 'Montserrat-ExtraBold.ttf',
+    Montserrat: 'Montserrat-Variable.ttf',
+    'Poppins ExtraBold': 'Poppins-ExtraBold.ttf',
+    'Playfair Display': 'PlayfairDisplay-Italic.ttf',
+  };
+  for (const s of Object.keys(CAPTION_STYLE_PRESETS) as CaptionStyle[]) {
+    const f = CAPTION_STYLE_PRESETS[s].font;
+    assert.ok(FONT_FILES[f], `${s} font ${f} has a known file`);
+    assert.ok(fs.existsSync(path.join(os.homedir(), '.fonts', FONT_FILES[f])), `${s} font file ${FONT_FILES[f]} installed`);
+  }
+});
+
+
+
+
 
 test('v8.6 normalizeClipLengthSec falls back to 30s for missing/invalid values', () => {
   assert.equal(normalizeClipLengthSec(undefined), 30);

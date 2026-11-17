@@ -1,5 +1,6 @@
 import type {
   AutoFetchPackItem,
+  CaptionOverrides,
   CaptionStyle,
   CopyrightEvaluation,
   FramingMode,
@@ -658,14 +659,39 @@ export function buildUploadedVideoSource(params: {
   };
 }
 
-/** Per-word motion. Every style animates — a static style reads as a
- * broken render next to the others. 'wordbox' is the bold style's motion:
- * the highlight box follows the spoken word, one word per event.
- * 'typewriter' is the sentence style's motion: the line reveals itself
- * word by word through the \kf fill. */
-export type CaptionMotion = 'pop' | 'fade' | 'pulse' | 'flip' | 'bounce' | 'sweep' | 'wordbox' | 'typewriter';
+/** Per-word motion — USER RULE (v8.8): 18 styles means 18 DIFFERENT
+ * motions, pairwise distinct, no sharing. Each value maps to its own
+ * \t transform in motionTag below (scale, rotation, blur, alpha and
+ * timing all differ), so every style moves differently on screen.
+ * 'wordbox*' are the four box styles' motions (the box follows the
+ * spoken word, one word per event); 'typewriter' snaps each word on
+ * like a keystroke (invisible until its moment, unlike 'sweep' where
+ * unspoken words sit dimmed in the secondary colour). */
+export type CaptionMotion =
+  | 'pop' | 'pop-big' | 'wordbox' | 'wordbox-slide' | 'wordbox-flip' | 'wordbox-zoom'
+  | 'sweep' | 'slide-up' | 'slide-down' | 'rise' | 'pulse' | 'pulse-glow'
+  | 'fade' | 'spin' | 'bounce' | 'bounce-soft' | 'flip' | 'typewriter';
+
+/** How the gallery card shows the style's highlight. 'word': the
+ * highlight box sits behind the spoken word (follows it in the video).
+ * 'line': the whole caption line sits on one box. 'glow': the text
+ * glows in the highlight colour. 'none': no box or glow. */
+export type CaptionHighlight = 'none' | 'word' | 'line' | 'glow';
 
 export interface CaptionStylePreset {
+  /** Name shown on the gallery card, exactly as in the reference. */
+  displayName: string;
+  /** Gallery-card sample split: [first line, second line], e.g. ['WATCH', 'THIS NOW']. */
+  sample: [string, string];
+  highlight: CaptionHighlight;
+  /** CSS hex of the highlight (box/glow colour), '' when highlight is 'none'. */
+  highlightCss: string;
+  /** The style's ONE signature colour (CSS hex). USER RULE (v8.8): all
+   * 18 accents are pairwise distinct — no two styles share a colour.
+   * The accent is always a colour the render really shows: the active
+   * word, the box, the glow, the outline, or the secondary (unspoken)
+   * words — the v8.8 tests assert it appears in the generated ASS. */
+  accentColour: string;
   font: string;
   fontSize: number;
   /** ASS colour &HAABBGGRR of the active word. */
@@ -683,44 +709,126 @@ export interface CaptionStylePreset {
   borderStyle: number;
   backColour: string;
   uppercase: boolean;
+  /** Bold (-1) / not-bold (0) in the ASS Style line. */
+  bold: boolean;
+  /** Italic (-1) / upright (0) in the ASS Style line. */
+  italic: boolean;
   motion: CaptionMotion;
   popScale: number;
   mode: 'karaoke' | 'sentence' | 'flash' | 'wordbox';
 }
 
 /**
- * ClipPulse v8.7 — seven caption designs, each unmistakably different:
- * its OWN font + its OWN highlight treatment + its OWN position/size +
- * its OWN motion. The v8.4 set failed this test — karaoke, lime, top and
- * flash all read as big yellow/white bold caps. Every font here must
- * actually exist on the machine: Anton + Archivo Black ship in ~/.fonts,
- * Bebas Neue + Montserrat ExtraBold + Poppins ExtraBold + Alfa Slab One +
- * Lilita One are installed by scripts/setup-local.sh, Noto Sans is a
- * system font. (The old 'bold' named Plus Jakarta Sans — never installed,
- * so libass silently rendered it in DejaVu Sans.)
- * DO NOT change the doac generator below — it is the locked production
- * standard. Karaoke keeps the Hormozi identity (Anton, yellow/white, pop);
- * the other styles move away from it.
+ * ClipPulse v8.8 — the 18 named styles from the reference gallery.
+ * USER RULE: 18 styles means 18 DIFFERENT motions and 18 DIFFERENT
+ * accent colours — pairwise distinct across the whole set, asserted by
+ * the v8.8 tests. The reference itself repeats colours (white on many
+ * cards, yellow on several), so where the reference's look would
+ * collide, the style keeps its shape/font/motion and takes the nearest
+ * distinct colour instead — the deviations are: 2026-C teal (not
+ * white), MrBeast orange (not yellow), Red Line rose box (not the same
+ * red as Hormozi V1), Cardone-A dark-maroon outline, Hollywood Fill
+ * dark-blue outline, YELLOW BURST pale-yellow text on a near-black box.
+ * ASS colours are &H00BBGGRR (CSS hex REVERSED — writing &H00 + the
+ * CSS hex renders the wrong colour; three presets had that bug).
+ * DOAC was removed in v8.8 (user: not needed) — the sample clips stay
+ * in examples/ + demo/ as history, but no code renders it any more.
+ * Default style is 'hormozi-v1' (the reference's first style).
+ * Every font here must actually exist on the machine: Anton, Bebas
+ * Neue, Montserrat ExtraBold, Montserrat (variable), Poppins ExtraBold
+ * and Playfair Display Italic are installed by scripts/setup-local.sh
+ * (Alfa Slab One + Lilita One stay installed for later styles).
  */
 export const CAPTION_STYLE_PRESETS: Record<CaptionStyle, CaptionStylePreset> = {
-  karaoke: { font: 'Anton', fontSize: 72, primaryColour: '&H0000D7FF', secondaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, motion: 'pop', popScale: 118, mode: 'karaoke' },
-  minimal: { font: 'Montserrat ExtraBold', fontSize: 40, primaryColour: '&H00FFFFFF', secondaryColour: '&H00BFBFBF', outlineColour: '&H00000000', outlineW: 1, shadowW: 0, alignment: 1, marginV: 200, borderStyle: 1, backColour: '&H80000000', uppercase: false, motion: 'fade', popScale: 118, mode: 'karaoke' },
-  bold: { font: 'Alfa Slab One', fontSize: 64, primaryColour: '&H00000000', secondaryColour: '&H00404040', outlineColour: '&H0000D7FF', outlineW: 6, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 3, backColour: '&H0000D7FF', uppercase: true, motion: 'wordbox', popScale: 115, mode: 'wordbox' },
-  lime: { font: 'Poppins ExtraBold', fontSize: 66, primaryColour: '&H0035F1C6', secondaryColour: '&H00FFFFFF', outlineColour: '&H0035F1C6', outlineW: 4, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, motion: 'pulse', popScale: 130, mode: 'karaoke' },
-  sentence: { font: 'Noto Sans', fontSize: 46, primaryColour: '&H00FFFFFF', secondaryColour: '&H00808080', outlineColour: '&H00000000', outlineW: 2, shadowW: 0, alignment: 2, marginV: 260, borderStyle: 3, backColour: '&HCC000000', uppercase: false, motion: 'typewriter', popScale: 118, mode: 'sentence' },
-  top: { font: 'Lilita One', fontSize: 56, primaryColour: '&H0000D7FF', secondaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 4, shadowW: 0, alignment: 8, marginV: 150, borderStyle: 1, backColour: '&H80000000', uppercase: true, motion: 'flip', popScale: 118, mode: 'karaoke' },
-  flash: { font: 'Bebas Neue', fontSize: 130, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H000000FF', outlineW: 6, shadowW: 0, alignment: 5, marginV: 0, borderStyle: 1, backColour: '&H80000000', uppercase: true, motion: 'bounce', popScale: 125, mode: 'flash' },
+  'hormozi-v1': { displayName: 'Hormozi V1', sample: ['WATCH', 'THIS NOW'], highlight: 'none', highlightCss: '', accentColour: '#FF2D2D', font: 'Anton', fontSize: 72, primaryColour: '&H002D2DFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, bold: true, italic: false, motion: 'pop', popScale: 118, mode: 'karaoke' },
+  'red-line': { displayName: 'Red Line', sample: ['WATCH', 'THIS NOW'], highlight: 'word', highlightCss: '#E11D48', accentColour: '#E11D48', font: 'Anton', fontSize: 68, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H00481DE1', outlineW: 6, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 3, backColour: '&H00481DE1', uppercase: true, bold: true, italic: false, motion: 'wordbox', popScale: 115, mode: 'wordbox' },
+  undercut: { displayName: 'Undercut', sample: ['Watch', 'this now'], highlight: 'none', highlightCss: '', accentColour: '#FFD800', font: 'Playfair Display', fontSize: 58, primaryColour: '&H0000D8FF', secondaryColour: '&H0000D8FF', outlineColour: '&H00000000', outlineW: 2, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, bold: false, italic: true, motion: 'sweep', popScale: 118, mode: 'karaoke' },
+  streamline: { displayName: 'Streamline', sample: ['WATCH', 'THIS NOW'], highlight: 'word', highlightCss: '#7C3AED', accentColour: '#7C3AED', font: 'Anton', fontSize: 68, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H00ED3A7C', outlineW: 6, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 3, backColour: '&H00ED3A7C', uppercase: true, bold: true, italic: false, motion: 'wordbox-slide', popScale: 115, mode: 'wordbox' },
+  'hormozi-2026-a': { displayName: 'Hormozi Short 2026 - A', sample: ['Watch', 'this now'], highlight: 'none', highlightCss: '', accentColour: '#FFFFFF', font: 'Bebas Neue', fontSize: 64, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 3, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, bold: true, italic: false, motion: 'slide-up', popScale: 118, mode: 'karaoke' },
+  'hormozi-2026-b': { displayName: 'Hormozi Short 2026 - B', sample: ['WATCH', 'THIS NOW'], highlight: 'glow', highlightCss: '#FFB020', accentColour: '#FFB020', font: 'Anton', fontSize: 72, primaryColour: '&H0020B0FF', secondaryColour: '&H00FFFFFF', outlineColour: '&H0020B0FF', outlineW: 4, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, bold: true, italic: false, motion: 'pulse', popScale: 130, mode: 'karaoke' },
+  'hormozi-2026-c': { displayName: 'Hormozi Short 2026 - C', sample: ['Watch', 'this now'], highlight: 'none', highlightCss: '', accentColour: '#2DD4BF', font: 'Montserrat ExtraBold', fontSize: 40, primaryColour: '&H00BFD42D', secondaryColour: '&H00BFBFBF', outlineColour: '&H00000000', outlineW: 1, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, bold: true, italic: false, motion: 'fade', popScale: 118, mode: 'karaoke' },
+  'hormozi-2026-d': { displayName: 'Hormozi Short 2026 - D', sample: ['THIS', ''], highlight: 'glow', highlightCss: '#3B82F6', accentColour: '#3B82F6', font: 'Bebas Neue', fontSize: 110, primaryColour: '&H00F6823B', secondaryColour: '&H00FFFFFF', outlineColour: '&H00F6823B', outlineW: 4, shadowW: 0, alignment: 5, marginV: 0, borderStyle: 1, backColour: '&H80000000', uppercase: true, bold: true, italic: false, motion: 'spin', popScale: 125, mode: 'flash' },
+  'hormozi-2026-e': { displayName: 'Hormozi Short 2026 - E', sample: ['WATCH', 'THIS NOW'], highlight: 'glow', highlightCss: '#4ADE80', accentColour: '#4ADE80', font: 'Anton', fontSize: 72, primaryColour: '&H0080DE4A', secondaryColour: '&H00FFFFFF', outlineColour: '&H0080DE4A', outlineW: 4, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, bold: true, italic: false, motion: 'pulse-glow', popScale: 130, mode: 'karaoke' },
+  mrbeast: { displayName: 'MrBeast', sample: ['WATCH', 'THIS NOW'], highlight: 'none', highlightCss: '', accentColour: '#F97316', font: 'Anton', fontSize: 76, primaryColour: '&H001673F9', secondaryColour: '&H00FFFFFF', outlineColour: '&H00000000', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, bold: true, italic: false, motion: 'pop-big', popScale: 140, mode: 'karaoke' },
+  'iman-a': { displayName: 'Iman - A', sample: ['Watch', 'this now'], highlight: 'none', highlightCss: '', accentColour: '#94A3B8', font: 'Montserrat', fontSize: 56, primaryColour: '&H00FFFFFF', secondaryColour: '&H00B8A394', outlineColour: '&H00000000', outlineW: 2, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, bold: false, italic: false, motion: 'slide-down', popScale: 118, mode: 'karaoke' },
+  'cardone-a': { displayName: 'Cardone - A', sample: ['WATCH', 'THIS NOW'], highlight: 'none', highlightCss: '', accentColour: '#7F1D1D', font: 'Anton', fontSize: 72, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H001D1D7F', outlineW: 5, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, bold: true, italic: false, motion: 'bounce', popScale: 125, mode: 'karaoke' },
+  'hollywood-fill': { displayName: 'Hollywood Fill', sample: ['WATCH', 'THIS NOW'], highlight: 'none', highlightCss: '', accentColour: '#1E3A8A', font: 'Anton', fontSize: 72, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H008A3A1E', outlineW: 8, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: true, bold: true, italic: false, motion: 'flip', popScale: 118, mode: 'karaoke' },
+  roman: { displayName: 'Roman', sample: ['WATCH', 'THIS NOW'], highlight: 'word', highlightCss: '#C2410C', accentColour: '#C2410C', font: 'Anton', fontSize: 68, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H000C41C2', outlineW: 6, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 3, backColour: '&H000C41C2', uppercase: true, bold: true, italic: false, motion: 'wordbox-flip', popScale: 115, mode: 'wordbox' },
+  sara: { displayName: 'SARA', sample: ['Watch', 'this'], highlight: 'glow', highlightCss: '#EC4899', accentColour: '#EC4899', font: 'Poppins ExtraBold', fontSize: 66, primaryColour: '&H009948EC', secondaryColour: '&H00FFFFFF', outlineColour: '&H009948EC', outlineW: 4, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 1, backColour: '&H80000000', uppercase: false, bold: true, italic: false, motion: 'bounce-soft', popScale: 130, mode: 'karaoke' },
+  ali: { displayName: 'ALI', sample: ['Watch', 'this now'], highlight: 'line', highlightCss: '#6B7280', accentColour: '#6B7280', font: 'Montserrat', fontSize: 48, primaryColour: '&H00FFFFFF', secondaryColour: '&H0080726B', outlineColour: '&H0080726B', outlineW: 2, shadowW: 0, alignment: 2, marginV: 260, borderStyle: 3, backColour: '&HCC80726B', uppercase: false, bold: false, italic: false, motion: 'typewriter', popScale: 118, mode: 'sentence' },
+  axel: { displayName: 'Axel', sample: ['Watch', 'this now'], highlight: 'word', highlightCss: '#15803D', accentColour: '#15803D', font: 'Poppins ExtraBold', fontSize: 60, primaryColour: '&H00FFFFFF', secondaryColour: '&H00FFFFFF', outlineColour: '&H003D8015', outlineW: 6, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 3, backColour: '&H003D8015', uppercase: false, bold: true, italic: false, motion: 'wordbox-zoom', popScale: 115, mode: 'wordbox' },
+  'yellow-burst': { displayName: 'YELLOW BURST', sample: ['WATCH', 'THIS NOW'], highlight: 'line', highlightCss: '#111827', accentColour: '#111827', font: 'Anton', fontSize: 72, primaryColour: '&H0047E0FD', secondaryColour: '&H0047E0FD', outlineColour: '&H00271811', outlineW: 6, shadowW: 0, alignment: 2, marginV: 340, borderStyle: 3, backColour: '&HCC271811', uppercase: true, bold: true, italic: false, motion: 'rise', popScale: 125, mode: 'karaoke' },
 };
+
+/**
+ * ClipPulse v8.8 — gallery-picker overrides, shared by the ASS
+ * generator and the React preview so both show the same thing.
+ * '#RRGGBB' -> ASS '&H00BBGGRR' (null when the hex is not valid).
+ */
+export function hexToAssColour(hex: string): string | null {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return null;
+  const rr = m[1].slice(0, 2);
+  const gg = m[1].slice(2, 4);
+  const bb = m[1].slice(4, 6);
+  return `&H00${bb}${gg}${rr}`.toUpperCase();
+}
+
+/** ASS '&H00BBGGRR' -> CSS '#RRGGBB' (falls back to white on bad input). */
+export function assColourToCss(ass: string): string {
+  const m = /^&H[0-9a-fA-F]{2}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(ass.trim());
+  if (!m) return '#FFFFFF';
+  return `#${m[3]}${m[2]}${m[1]}`.toUpperCase();
+}
+
+/**
+ * Caption Position slider (0–100%) -> ASS MarginV. For bottom/middle
+ * styles MarginV is the distance from the bottom edge (0–900px of the
+ * 1920px frame); for top-pinned styles it is the distance from the top
+ * edge (0–200px). 0% = lowest on screen, 100% = highest.
+ */
+export function marginVForPositionPct(pct: number, alignment: number): number {
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  return alignment === 8 ? Math.round(p * 2) : Math.round((100 - p) * 9);
+}
+
+/** The slider position that reproduces a preset's own MarginV. */
+export function positionPctForPreset(preset: CaptionStylePreset): number {
+  return preset.alignment === 8
+    ? Math.max(0, Math.min(100, Math.round(preset.marginV / 2)))
+    : Math.max(0, Math.min(100, Math.round(100 - preset.marginV / 9)));
+}
+
+/** Resolve a preset + user overrides to the values that actually render. */
+export function applyCaptionOverrides(
+  preset: CaptionStylePreset,
+  overrides?: CaptionOverrides,
+): { fontSize: number; primaryColour: string; marginV: number } {
+  const fontSize =
+    overrides?.fontSize !== undefined && Number.isFinite(overrides.fontSize)
+      ? Math.max(20, Math.min(150, Math.round(overrides.fontSize)))
+      : preset.fontSize;
+  const primaryColour =
+    overrides?.fontColour !== undefined
+      ? hexToAssColour(overrides.fontColour) ?? preset.primaryColour
+      : preset.primaryColour;
+  const marginV =
+    overrides?.positionPct !== undefined && Number.isFinite(overrides.positionPct)
+      ? marginVForPositionPct(overrides.positionPct, preset.alignment)
+      : preset.marginV;
+  return { fontSize, primaryColour, marginV };
+}
 
 export function generateAssSubtitle(
   segments: TranscriptSegment[],
   startSec: number,
   endSec: number,
   hookText: string,
-  style: CaptionStyle = 'karaoke',
+  style: CaptionStyle = 'hormozi-v1',
   attributionCredit?: string,
   includeProgressBar = true,
   popScale?: number,
+  overrides?: CaptionOverrides,
 ): string {
   const sortedWords = extractWordsFromSegments(segments)
     .filter((w) => w.start >= startSec && w.start < endSec)
@@ -739,6 +847,7 @@ export function generateAssSubtitle(
   const clipDurationMs = Math.round(clipDuration * 1000);
 
   const preset = CAPTION_STYLE_PRESETS[style];
+  const effective = applyCaptionOverrides(preset, overrides);
   const effectivePopScale = popScale ?? preset.popScale;
   const secondaryColour = preset.secondaryColour;
 
@@ -752,7 +861,7 @@ export function generateAssSubtitle(
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Karaoke,${preset.font},${preset.fontSize},${preset.primaryColour},${secondaryColour},${preset.outlineColour},${preset.backColour},-1,0,0,0,100,100,0,0,${preset.borderStyle},${preset.outlineW},${preset.shadowW},${preset.alignment},60,60,${preset.marginV},1`,
+    `Style: Karaoke,${preset.font},${effective.fontSize},${effective.primaryColour},${secondaryColour},${preset.outlineColour},${preset.backColour},${preset.bold ? -1 : 0},${preset.italic ? -1 : 0},0,0,100,100,0,0,${preset.borderStyle},${preset.outlineW},${preset.shadowW},${preset.alignment},60,60,${effective.marginV},1`,
     'Style: HookBanner,Plus Jakarta Sans,74,&H00FFFFFF,&H00FFFFFF,&H000F172A,&HD01E1DE1,-1,0,0,0,100,100,0,0,3,18,0,8,70,70,220,1',
     'Style: CreditTag,DM Sans,32,&H80FFFFFF,&H80FFFFFF,&H00000000,&H60000000,0,0,0,0,100,100,0,0,1,2,0,2,40,40,90,1',
     'Style: ProgressBar,DM Sans,10,&H00481DE1,&H00481DE1,&H00481DE1,&H00481DE1,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1',
@@ -791,12 +900,17 @@ export function generateAssSubtitle(
     return `{${BS}kf${durCs}${BS}t(${wStartMs},${wStartMs + popMs},${BS}fscx${effectivePopScale}${BS}fscy${effectivePopScale})${BS}t(${wStartMs + popMs},${settleMs},${BS}fscx100${BS}fscy100)}`;
   };
 
-  // v8.7 — one motion per style, all real ASS \t transforms rendered by
+  // v8.8 — one DIFFERENT motion per style (user rule: 18 styles,
+  // 18 motions, no sharing), all real ASS \t transforms rendered by
   // libass (verified by frame pairs, not a flag). Timings are ms relative
-  // to the event start, exactly like popTag's.
+  // to the event start, exactly like popTag's. 'pop-big' and 'wordbox'
+  // reuse popTag, which reads the preset's own popScale (140 / 115),
+  // so they still move differently from 'pop' (118).
   const motionTag = (motion: CaptionMotion, wStartMs: number, wEndMs: number, durCs: number): string => {
     switch (motion) {
       case 'pop':
+      case 'pop-big':
+      case 'wordbox':
         return popTag(wStartMs, wEndMs, durCs);
       case 'fade': {
         // Invisible until spoken, then fades in over ~150ms.
@@ -807,6 +921,10 @@ export function generateAssSubtitle(
         // Neon glow that settles: heavy blur decaying to a soft halo.
         return `{${BS}blur4${BS}t(${wStartMs},${wEndMs},${BS}blur1)${BS}kf${durCs}}`;
       }
+      case 'pulse-glow': {
+        // Stronger glow: blur + border both decay (the halo shrinks).
+        return `{${BS}blur6${BS}bord6${BS}t(${wStartMs},${wEndMs},${BS}blur2${BS}bord2)${BS}kf${durCs}}`;
+      }
       case 'flip': {
         // Flips in around the horizontal axis, then the \kf fill sweeps.
         return `{${BS}fry80${BS}t(${wStartMs},${wStartMs + 200},${BS}fry0)${BS}kf${durCs}}`;
@@ -815,8 +933,44 @@ export function generateAssSubtitle(
         // Overshoots big, dips small, settles — the word bounces in.
         return `{${BS}t(${wStartMs},${wStartMs + 90},${BS}fscx150${BS}fscy150)${BS}t(${wStartMs + 90},${wStartMs + 200},${BS}fscx90${BS}fscy90)${BS}t(${wStartMs + 200},${wStartMs + 320},${BS}fscx100${BS}fscy100)${BS}kf${durCs}}`;
       }
-      case 'wordbox':
-      case 'typewriter':
+      case 'bounce-soft': {
+        // Gentle bounce: grows a little, settles — no dip below 100.
+        return `{${BS}t(${wStartMs},${wStartMs + 90},${BS}fscx125${BS}fscy125)${BS}t(${wStartMs + 90},${wStartMs + 220},${BS}fscx100${BS}fscy100)${BS}kf${durCs}}`;
+      }
+      case 'slide-up': {
+        // Rises into place: starts small + transparent, grows to full size.
+        return `{${BS}1a&HCC&${BS}fscx80${BS}fscy60${BS}t(${wStartMs},${wStartMs + 160},${BS}1a&H00&${BS}fscx100${BS}fscy100)${BS}kf${durCs}}`;
+      }
+      case 'slide-down': {
+        // Drops into place: starts tall + transparent, squashes to normal.
+        return `{${BS}1a&HCC&${BS}fscy140${BS}t(${wStartMs},${wStartMs + 160},${BS}1a&H00&${BS}fscy100)${BS}kf${durCs}}`;
+      }
+      case 'rise': {
+        // Rises from flat: invisible + squashed flat, grows tall. Unlike
+        // slide-up it scales vertically only and starts fully invisible.
+        return `{${BS}1a&HFF&${BS}fscy50${BS}t(${wStartMs},${wStartMs + 200},${BS}1a&H00&${BS}fscy100)${BS}kf${durCs}}`;
+      }
+      case 'spin': {
+        // Spins in around the screen axis, then the \kf fill sweeps.
+        return `{${BS}frz90${BS}t(${wStartMs},${wStartMs + 200},${BS}frz0)${BS}kf${durCs}}`;
+      }
+      case 'wordbox-slide': {
+        // The box grows in sideways: narrow + transparent, widens to full.
+        return `{${BS}1a&HCC&${BS}fscx80${BS}t(${wStartMs},${wStartMs + 200},${BS}1a&H00&${BS}fscx100)${BS}kf${durCs}}`;
+      }
+      case 'wordbox-flip': {
+        // The box flips in around the horizontal axis.
+        return `{${BS}fry70${BS}t(${wStartMs},${wStartMs + 180},${BS}fry0)${BS}kf${durCs}}`;
+      }
+      case 'wordbox-zoom': {
+        // The box zooms in from half size.
+        return `{${BS}fscx50${BS}fscy50${BS}t(${wStartMs},${wStartMs + 180},${BS}fscx100${BS}fscy100)${BS}kf${durCs}}`;
+      }
+      case 'typewriter': {
+        // Snaps on like a keystroke: invisible until its exact moment,
+        // then fully visible at once (no fade, no fill-in-advance).
+        return `{${BS}1a&HFF&${BS}t(${wStartMs},${wStartMs + 1},${BS}1a&H00&)${BS}kf${durCs}}`;
+      }
       case 'sweep':
       default:
         return `{${BS}kf${durCs}}`;
@@ -838,7 +992,11 @@ export function generateAssSubtitle(
             .map((w) => {
               const durCs = Math.max(12, Math.round((w.end - w.start) * 100));
               const word = preset.uppercase ? w.word.toUpperCase() : w.word;
-              return `{${BS}kf${durCs}}${word}`;
+              // v8.8: the sentence style's motion (typewriter) gets its
+              // own tag, timed at the word's offset inside the segment.
+              const wStartMs = Math.max(0, Math.round((w.start - segStart) * 1000));
+              const wEndMs = Math.max(wStartMs + 120, Math.round((w.end - segStart) * 1000));
+              return `${motionTag(preset.motion, wStartMs, wEndMs, durCs)}${word}`;
             })
             .join(' ')
         : seg.text.trim().replace(/\s+/g, ' ');
@@ -869,7 +1027,7 @@ export function generateAssSubtitle(
       const text = preset.uppercase ? w.word.toUpperCase() : w.word;
       const wEndMs = Math.max(120, Math.round((wEnd - wStart) * 1000));
       lines.push(
-        `Dialogue: 0,${formatAssTimecode(wStart)},${formatAssTimecode(wEnd)},Karaoke,,0,0,0,,${popTag(0, wEndMs, durCs)}${text}`
+        `Dialogue: 0,${formatAssTimecode(wStart)},${formatAssTimecode(wEnd)},Karaoke,,0,0,0,,${motionTag(preset.motion, 0, wEndMs, durCs)}${text}`
       );
     }
   } else {
@@ -934,167 +1092,6 @@ export function buildFaceTrackCropX(prevRatio: number | null, ratio: number, eas
   const prev = prevRatio.toFixed(2);
   const ease = easeSec.toFixed(2);
   return `max(0\\,min(iw-ih*9/16\\,iw*(${prev}+(${cur}-${prev})*min(1\\,t/${ease}))-(ih*9/16)/2))`;
-}
-
-/**
- * ClipPulse v8 — edit styles for the forced-choice variants. Manik
- * rejected the v7.1 clip as basic AND all three reference clips, so the
- * bar is set by two variants of the same moment, not by a reference.
- * 'punchy': zoom punches + loud SFX + big hook title + stronger pop.
- * 'fullframe': the source's own framing kept, gentle push-in, one whoosh.
- * Anything else (including undefined) is the current v7 behaviour.
- */
-export type EditStyle = 'punchy' | 'fullframe' | 'doac';
-
-export const ARCHIVO_BLACK_FONT_PATH = '/home/hatch/.fonts/ArchivoBlack-Regular.ttf';
-
-/**
- * ClipPulse v8 (DOAC spec, measured from the reference Short) — blur-fill
- * layout: the 16:9 source is centre-cropped to 4:5 (720x900 at 720p) and
- * placed in the middle of the 9:16 frame; the top and bottom bars are the
- * same frame, scaled up and heavily blurred (the classic Diary Of A CEO
- * Short look — the picture is BIG, the bars carry the title/captions).
- * No face tracking, no zoom inside a shot — framing is static within
- * each shot; the source's own camera cuts do all the changing.
- * Returns the filter up to the overlay; the caller appends the visual
- * transform, title and captions, then `,format=yuv420p[v]`.
- */
-export function buildDoacBlurFill(targetW: number, targetH: number): string {
-  const fgH = Math.round((targetW * 5) / 4);
-  return (
-    `[0:v]scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},boxblur=16:3[bg];` +
-    `[0:v]crop=ih*4/5:ih:(iw-ih*4/5)/2:0,scale=${targetW}:${fgH}:flags=bilinear[fg];` +
-    `[bg][fg]overlay=(W-w)/2:(H-h)/2`
-  );
-}
-
-/** One detected face: centre x and width, both 0-100 of frame width. */
-export interface DoacFace {
-  x: number;
-  w: number;
-}
-
-export type DoacShotLayout = 'crop45' | 'letterbox169';
-
-/**
- * ClipPulse v8.2 — per-shot picture aspect for the DOAC layout. The 4:5
- * centre crop covers (4/5)/aspect of the source width (0.45 for 16:9);
- * a face survives it only when its whole box sits inside that centred
- * window (2-point margin). Two faces far apart — the Raj two-shot has
- * centres ~26% and ~77% — fail the window, so that shot gets a 16:9
- * letterbox picture instead of two half faces. No faces, or an unusable
- * aspect, falls back to the 4:5 crop (the task's required fallback).
- */
-export function decideDoacShotLayout(
-  faces: DoacFace[],
-  sourceAspect: number,
-): DoacShotLayout {
-  if (!Number.isFinite(sourceAspect) || sourceAspect <= 0) return 'crop45';
-  const cropW = 0.8 / sourceAspect;
-  if (cropW >= 1) return 'crop45';
-  const lo = (1 - cropW) / 2;
-  const hi = (1 + cropW) / 2;
-  const margin = 0.02;
-  for (const f of faces) {
-    if (!Number.isFinite(f.x) || !Number.isFinite(f.w)) continue;
-    const left = (f.x - f.w / 2) / 100;
-    const right = (f.x + f.w / 2) / 100;
-    if (left < lo + margin || right > hi - margin) return 'letterbox169';
-  }
-  return 'crop45';
-}
-
-/** Foreground picture height at 720p: 900 for the 4:5 crop, 405 for the 16:9 letterbox. */
-export function doacFgHeight(targetW: number, layout: DoacShotLayout): number {
-  return layout === 'letterbox169' ? Math.round((targetW * 9) / 16) : Math.round((targetW * 5) / 4);
-}
-
-/**
- * ClipPulse v8.2 — one DOAC scene's video chain: the trimmed source is
- * split into a blurred full-frame background and the foreground picture
- * (4:5 centre crop, or 16:9 letterbox when the shot is a two-shot),
- * overlaid centred. Returns the chain up to `[vN]`; the caller concats
- * the scenes and applies the transform, title and captions after.
- */
-export function buildDoacSceneChain(
-  index: number,
-  startSec: number,
-  endSec: number,
-  layout: DoacShotLayout,
-  targetW: number,
-  targetH: number,
-): string {
-  const fgH = doacFgHeight(targetW, layout);
-  const fg =
-    layout === 'letterbox169'
-      ? `scale=${targetW}:${fgH}:force_original_aspect_ratio=increase,crop=${targetW}:${fgH}`
-      : `crop=ih*4/5:ih:(iw-ih*4/5)/2:0,scale=${targetW}:${fgH}:flags=bilinear`;
-  const s = startSec.toFixed(2);
-  const e = endSec.toFixed(2);
-  return (
-    `[0:v]trim=start=${s}:end=${e},setpts=PTS-STARTPTS,split=2[sin${index}a][sin${index}b];` +
-    `[sin${index}a]scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},boxblur=16:3[bg${index}];` +
-    `[sin${index}b]${fg}[fg${index}];` +
-    `[bg${index}][fg${index}]overlay=(W-w)/2:(H-h)/2,setsar=1[v${index}]`
-  );
-}
-
-/**
- * ClipPulse v8 (DOAC spec) — captions for the DOAC layout. Same
- * word-by-word karaoke highlight as the Hormozi style (current word
- * yellow, rest white, ALL CAPS) but: Archivo Black (wide extra-bold,
- * NOT condensed Anton), 80pt, positioned BELOW the picture on the bottom
- * blur bar (MarginV 160 at PlayRes 1920), NO scale pop (highlight only
- * — the reference shows no pop), NO progress bar, NO hook banner (the
- * title is a drawtext overlay, not an ASS event).
- */
-export function generateDoacSubtitle(
-  segments: TranscriptSegment[],
-  startSec: number,
-  endSec: number,
-): string {
-  const sortedWords = extractWordsFromSegments(segments)
-    .filter((w) => w.start >= startSec && w.start < endSec)
-    .sort((a, b) => a.start - b.start);
-  // Same overlap guard as generateAssSubtitle: never two lines at once.
-  const allWords: TranscriptWord[] = [];
-  for (const w of sortedWords) {
-    const prev = allWords[allWords.length - 1];
-    if (prev && w.start < prev.end - 0.02) continue;
-    allWords.push(w);
-  }
-  const lines: string[] = [
-    '[Script Info]',
-    'Title: ClipPulse DOAC Spec',
-    'ScriptType: v4.00+',
-    'PlayResX: 1080',
-    'PlayResY: 1920',
-    'WrapStyle: 0',
-    '',
-    '[V4+ Styles]',
-    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    'Style: Doac,Archivo Black,80,&H0000D7FF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,0,2,60,60,160,1',
-    '',
-    '[Events]',
-    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
-  ];
-  const chunkSize = 4;
-  for (let i = 0; i < allWords.length; i += chunkSize) {
-    const chunk = allWords.slice(i, i + chunkSize);
-    if (chunk.length === 0) continue;
-    const chunkStart = Math.max(0, chunk[0].start - startSec);
-    const chunkEnd = Math.max(chunkStart + 0.35, chunk[chunk.length - 1].end - startSec);
-    const karaokeText = chunk
-      .map((w) => {
-        const durCs = Math.max(12, Math.round((w.end - w.start) * 100));
-        return `{\\kf${durCs}}${w.word.toUpperCase()}`;
-      })
-      .join(' ');
-    lines.push(
-      `Dialogue: 0,${formatAssTimecode(chunkStart)},${formatAssTimecode(chunkEnd)},Doac,,0,0,0,,${karaokeText}`,
-    );
-  }
-  return lines.join('\n');
 }
 
 /**
@@ -1192,115 +1189,6 @@ export function escapeDrawtext(text: string): string {
     .replace(/:/g, '\\:')
     .replace(/'/g, "\\'")
     .replace(/,/g, '\\,');
-}
-
-export const ANTON_FONT_PATH = '/home/hatch/.fonts/Anton-Regular.ttf';
-
-/**
- * ClipPulse v8.1 — measured advance widths (em) for the two title
- * fonts, read with fontTools from ~/.fonts/{ArchivoBlack,Anton}-
- * Regular.ttf. Used to wrap the hook title so it can NEVER overflow
- * the frame. v8 bug, measured on the sample: 'OF SEAL TEAM 6 WOULD
- * COME' in Archivo Black at 63px is 1089px wide on a 720px frame,
- * and drawtext's x=(w-text_w)/2 centred it off BOTH edges (frame
- * showed 'EAL TEAM 6 WOULD C'). Unknown chars fall back to 0.7em.
- */
-const ARCHIVO_TITLE_EM: Record<string, number> = {
-  A: 0.778, B: 0.778, C: 0.778, D: 0.778, E: 0.722, F: 0.667, G: 0.833,
-  H: 0.833, I: 0.389, J: 0.667, K: 0.833, L: 0.667, M: 0.944, N: 0.833,
-  O: 0.833, P: 0.722, Q: 0.833, R: 0.778, S: 0.722, T: 0.722, U: 0.833,
-  V: 0.778, W: 1.0, X: 0.778, Y: 0.778, Z: 0.722,
-  '0': 0.667, '1': 0.667, '2': 0.667, '3': 0.667, '4': 0.667, '5': 0.667,
-  '6': 0.667, '7': 0.667, '8': 0.667, '9': 0.667,
-  ' ': 0.333, '.': 0.333, ',': 0.333, '!': 0.333, '?': 0.611, "'": 0.278,
-  '&': 0.889, ':': 0.333, ';': 0.333, '-': 0.333, '(': 0.389, ')': 0.389,
-};
-const ANTON_TITLE_EM: Record<string, number> = {
-  A: 0.485, B: 0.479, C: 0.474, D: 0.493, E: 0.412, F: 0.399, G: 0.485,
-  H: 0.499, I: 0.227, J: 0.466, K: 0.472, L: 0.397, M: 0.746, N: 0.498,
-  O: 0.486, P: 0.472, Q: 0.494, R: 0.477, S: 0.461, T: 0.396, U: 0.474,
-  V: 0.469, W: 0.712, X: 0.484, Y: 0.446, Z: 0.41,
-  '0': 0.494, '1': 0.331, '2': 0.494, '3': 0.494, '4': 0.494, '5': 0.494,
-  '6': 0.494, '7': 0.494, '8': 0.494, '9': 0.494,
-  ' ': 0.234, '.': 0.229, ',': 0.236, '!': 0.229, '?': 0.492, "'": 0.214,
-  '&': 0.52, ':': 0.242, ';': 0.245, '-': 0.311, '(': 0.291, ')': 0.291,
-};
-
-export function measureTitleWidthEm(text: string, font: 'archivo' | 'anton'): number {
-  const table = font === 'anton' ? ANTON_TITLE_EM : ARCHIVO_TITLE_EM;
-  let em = 0;
-  for (const ch of text) em += table[ch] ?? 0.7;
-  return em;
-}
-
-/** Split words into the two lines whose wider line is narrowest. */
-export function bestTwoLineSplit(words: string[], font: 'archivo' | 'anton'): [string, string] {
-  let best: [number, string, string] | null = null;
-  for (let i = 1; i < words.length; i++) {
-    const a = words.slice(0, i).join(' ');
-    const b = words.slice(i).join(' ');
-    const m = Math.max(measureTitleWidthEm(a, font), measureTitleWidthEm(b, font));
-    if (best === null || m < best[0]) best = [m, a, b];
-  }
-  return best ? [best[1], best[2]] : [words.join(' '), ''];
-}
-
-/**
- * ClipPulse v8 — big hook title for the punchy variant: Anton, white on
- * a black banner, top-centre, first `durationSec` seconds only. Returns
- * '' for empty text (caller inserts nothing). This replaces the ASS
- * HookBanner for the punchy variant — the ASS banner was a small box
- * that read as a caption, not a title.
- *
- * v8.1 — the title is width-wrapped, never clipped: one line when it
- * fits (same output as before), otherwise the best two-line split with
- * the font shrunk until the wider line fits maxWidth (targetW - 60px).
- * The DOAC reference title itself needs this: 'A SOVIET GROCERY STORE
- * HAD ONLY 77 ITEMS' is 1694px at 63px and renders as two 43px lines.
- */
-export function buildHookTitleDrawtext(
-  text: string,
-  targetW: number,
-  targetH: number,
-  durationSec = 2.5,
-  opts: { fontfile?: string; boxed?: boolean; fontcolor?: string } = {},
-): string {
-  const clean = text.trim().toUpperCase().replace(/\s+/g, ' ').slice(0, 42);
-  if (!clean) return '';
-  const font: 'archivo' | 'anton' =
-    opts.fontfile === undefined || opts.fontfile.includes('Anton') ? 'anton' : 'archivo';
-  const baseFontSize = Math.round(targetW * 0.088);
-  const maxWidthPx = targetW - 60;
-  const fontfile = opts.fontfile ?? ANTON_FONT_PATH;
-  const fontcolor = opts.fontcolor ?? 'white';
-  const enable = `enable='between(t\\,0\\,${durationSec.toFixed(1)})'`;
-  const one = (line: string, size: number, y: number): string => {
-    const border = Math.max(2, Math.round(size / 14));
-    const boxBorder = Math.round(size * 0.35);
-    const box =
-      opts.boxed === false
-        ? ''
-        : `box=1:boxcolor=black@0.55:boxborderw=${boxBorder}:`;
-    return (
-      `drawtext=fontfile=${fontfile}:text='${escapeDrawtext(line)}':` +
-      `fontsize=${size}:fontcolor=${fontcolor}:borderw=${border}:bordercolor=black:` +
-      `${box}` +
-      `x=(w-text_w)/2:y=${y}:${enable}`
-    );
-  };
-  if (measureTitleWidthEm(clean, font) * baseFontSize <= maxWidthPx) {
-    return one(clean, baseFontSize, Math.round(targetH * 0.07));
-  }
-  const words = clean.split(' ');
-  if (words.length < 2) {
-    return one(clean, baseFontSize, Math.round(targetH * 0.07));
-  }
-  const [l1, l2] = bestTwoLineSplit(words, font);
-  const maxLineEm = Math.max(measureTitleWidthEm(l1, font), measureTitleWidthEm(l2, font));
-  const fontSize = Math.max(28, Math.min(baseFontSize, Math.floor(maxWidthPx / maxLineEm)));
-  const y1 = Math.round(targetH * 0.015);
-  const y2 = y1 + Math.round(fontSize * 1.12);
-  return `${one(l1, fontSize, y1)},${one(l2, fontSize, y2)}`;
 }
 
 /**

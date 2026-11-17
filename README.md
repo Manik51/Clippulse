@@ -45,6 +45,11 @@ clip is linked under it. All seven were rendered from real YouTube
 moments and verified frame by frame; the full index is in
 [examples/styles/README.md](examples/styles/README.md).
 
+> **v8.8 (2026-11-17):** the app now ships **18 caption styles** (see
+> [PRODUCTION-READY.md](PRODUCTION-READY.md)). The gallery below is the
+> v8.7 set — it is being refreshed to the 18-style set; `doac` was retired
+> from the app in v8.8 (its folder stays here as history).
+
 | Style | Preview (plays by itself) | Full clip |
 |---|---|---|
 | **DOAC** — the locked production standard: 4:5 crop with blur-fill bars, yellow hook title, captions below the picture | <img src="examples/styles/doac/clip.gif" width="135" alt="DOAC style preview — looping clip"> | [doac/clip.mp4](examples/styles/doac/clip.mp4) |
@@ -158,9 +163,9 @@ clippulse/
 │   └── components/         # TrendingClipsPanel, ExportModal, TopBar
 ├── scripts/                # PySceneDetect, YuNet face detection, thumbnails
 ├── assets/                 # Logo (SVG + PNG), flow diagram, demo GIF, screenshots, how-to visual
-├── examples/               # The approved DOAC sample clip + 8 caption-style showcases
+├── examples/               # DOAC sample clip (history) + caption-style showcases (v8.7 set; v8.8 18-style refresh pending)
 ├── renders/                # Your rendered clips (git-ignored)
-└── PRODUCTION-READY.md     # Full build history, v1 → v8.7
+└── PRODUCTION-READY.md     # Full build history, v1 → v8.8
 ```
 
 ## Roadmap

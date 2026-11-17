@@ -67,23 +67,20 @@ else
   echo "[OK] YuNet model found: $YUNET_MODEL"
 fi
 
-# 5. Download the caption fonts (OFL, free) the 7 subtitle styles need:
-#    Anton (Hormozi) + Archivo Black (DOAC) + Bebas Neue (Word Flash) +
-#    Montserrat ExtraBold (Minimal) + Poppins ExtraBold (Lime glow) +
-#    Alfa Slab One (Bold wordbox) + Lilita One (Top flip).
-#    Noto Sans (Sentence) is a system font on most Linux desktops.
-#    Without these, libass silently falls back to DejaVu Sans and the
-#    styles stop looking distinct.
+# 5. Download the caption fonts (OFL, free) the 18 subtitle styles need:
+#    Anton (Hormozi V1 / MrBeast / Cardone-A / Hollywood Fill / Roman /
+#    Streamline / 2026-B / 2026-E) + Bebas Neue (2026-A / 2026-D) +
+#    Montserrat ExtraBold (2026-C) + Montserrat (Iman-A / ALI) +
+#    Poppins ExtraBold (SARA / Axel) + Playfair Display Italic
+#    (Undercut) + Alfa Slab One + Lilita One (kept installed; no v8.8
+#    style uses them, they stay for later styles). Noto Sans is a
+#    system font on most Linux desktops. Without these, libass silently
+#    falls back to DejaVu Sans and the styles stop looking distinct.
 mkdir -p ~/.fonts
 if [ ! -f ~/.fonts/Anton-Regular.ttf ]; then
   echo "==> Downloading Anton font..."
   curl -fsSL -o ~/.fonts/Anton-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf" \
     || echo "[WARN] Could not download Anton — Hormozi captions fall back to a system font."
-fi
-if [ ! -f ~/.fonts/ArchivoBlack-Regular.ttf ]; then
-  echo "==> Downloading Archivo Black font..."
-  curl -fsSL -o ~/.fonts/ArchivoBlack-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/archivoblack/ArchivoBlack-Regular.ttf" \
-    || echo "[WARN] Could not download Archivo Black — DOAC captions fall back to a system font."
 fi
 if [ ! -f ~/.fonts/BebasNeue-Regular.ttf ]; then
   echo "==> Downloading Bebas Neue font..."
@@ -108,9 +105,27 @@ fi
 if [ ! -f ~/.fonts/LilitaOne-Regular.ttf ]; then
   echo "==> Downloading Lilita One font..."
   curl -fsSL -o ~/.fonts/LilitaOne-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/lilitaone/LilitaOne-Regular.ttf" \
-    || echo "[WARN] Could not download Lilita One — Top flip falls back to a system font."
+    || echo "[WARN] Could not download Lilita One."
+fi
+if [ ! -f ~/.fonts/PlayfairDisplay-Italic.ttf ]; then
+  echo "==> Downloading Playfair Display Italic font..."
+  curl -fsSL -o ~/.fonts/PlayfairDisplay-Italic.ttf "https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay-Italic%5Bwght%5D.ttf" \
+    || echo "[WARN] Could not download Playfair Display Italic — Undercut falls back to a system font."
+fi
+if [ ! -f ~/.fonts/Montserrat-Variable.ttf ]; then
+  echo "==> Downloading Montserrat font..."
+  curl -fsSL -o ~/.fonts/Montserrat-Variable.ttf "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf" \
+    || echo "[WARN] Could not download Montserrat — Iman-A / ALI fall back to a system font."
 fi
 if command -v fc-cache >/dev/null 2>&1; then fc-cache -f ~/.fonts >/dev/null 2>&1 || true; fi
+
+# 5b. The browser gallery needs the same fonts: copy them into
+# public/fonts/ so the @font-face rules in src/index.css can serve
+# them (the ffmpeg/libass renders read ~/.fonts directly).
+mkdir -p public/fonts
+for f in Anton-Regular BebasNeue-Regular Montserrat-ExtraBold Montserrat-Variable Poppins-ExtraBold AlfaSlabOne-Regular LilitaOne-Regular PlayfairDisplay-Italic; do
+  [ -f ~/.fonts/$f.ttf ] && cp -f ~/.fonts/$f.ttf public/fonts/$f.ttf
+done
 
 # Optional Python tools for full offline Whisper / MediaPipe pipeline
 # (--break-system-packages: Debian/Ubuntu's pip refuses --user installs

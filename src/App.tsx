@@ -29,6 +29,7 @@ import {
 } from './lib/virality';
 import type {
   AutoFetchPackItem,
+  CaptionOverrides,
   CaptionStyle,
   FramingMode,
   LanguageMode,
@@ -91,7 +92,8 @@ export default function App() {
   // Reel Preview & Export state
   const [playbackTime, setPlaybackTime] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>('karaoke');
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>('hormozi-v1');
+  const [captionOverrides, setCaptionOverrides] = useState<CaptionOverrides>({});
   const [framingMode, setFramingMode] = useState<FramingMode>(initialSource.framingMode);
   const [hookText, setHookText] = useState<string>(initialTopWin?.suggestedHooks[0] || '');
   const [faceOffsetX, setFaceOffsetX] = useState<number>(initialTopWin?.faceOffsetX || 50);
@@ -565,10 +567,12 @@ export default function App() {
             hookText,
             captionStyle,
             includeCredit ? `CC-BY Source: ${source.channel}` : undefined,
-            copyrightSafeTransform
+            copyrightSafeTransform,
+            undefined,
+            captionOverrides
           )
         : '',
-    [source.segments, source.channel, selectedWindow, hookText, captionStyle, includeCredit, copyrightSafeTransform]
+    [source.segments, source.channel, selectedWindow, hookText, captionStyle, includeCredit, copyrightSafeTransform, captionOverrides]
   );
 
   const ffmpegCommand = useMemo(
@@ -643,7 +647,7 @@ export default function App() {
         </div>
 
         {activeTab === 'trending' ? (
-          <TrendingClipsPanel />
+          <TrendingClipsPanel captionStyle={captionStyle} captionOverrides={captionOverrides} />
         ) : activeTab === 'workbench' ? (
           <>
             <SourceInputBar
@@ -722,6 +726,7 @@ export default function App() {
                     isPlaying={isPlaying}
                     hookText={hookText}
                     captionStyle={captionStyle}
+                    captionOverrides={captionOverrides}
                     framingMode={framingMode}
                     faceOffsetX={faceOffsetX}
                     includeCredit={includeCredit}
@@ -739,6 +744,7 @@ export default function App() {
                     }}
                     onHookTextChange={setHookText}
                     onCaptionStyleChange={setCaptionStyle}
+                    onCaptionOverridesChange={setCaptionOverrides}
                     onFramingModeChange={setFramingMode}
                     onFaceOffsetXChange={setFaceOffsetX}
                     onToggleCredit={setIncludeCredit}

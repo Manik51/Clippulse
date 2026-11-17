@@ -1,6 +1,36 @@
 export type LanguageMode = 'en' | 'bn';
 
-export type CaptionStyle = 'karaoke' | 'minimal' | 'bold' | 'lime' | 'sentence' | 'top' | 'flash';
+export type CaptionStyle =
+  | 'hormozi-v1'
+  | 'red-line'
+  | 'undercut'
+  | 'streamline'
+  | 'hormozi-2026-a'
+  | 'hormozi-2026-b'
+  | 'hormozi-2026-c'
+  | 'hormozi-2026-d'
+  | 'hormozi-2026-e'
+  | 'mrbeast'
+  | 'iman-a'
+  | 'cardone-a'
+  | 'hollywood-fill'
+  | 'roman'
+  | 'sara'
+  | 'ali'
+  | 'axel'
+  | 'yellow-burst';
+
+/**
+ * ClipPulse v8.8 — gallery-picker overrides, wired into the render.
+ * Any field left undefined keeps the preset's own value. fontSize is
+ * px (slider 20–72); fontColour is a '#RRGGBB' hex; positionPct is
+ * 0–100 (0 = lowest, 100 = highest on screen).
+ */
+export interface CaptionOverrides {
+  fontSize?: number;
+  fontColour?: string;
+  positionPct?: number;
+}
 
 export type WorkspaceTab = 'workbench' | 'blueprint' | 'trending';
 
