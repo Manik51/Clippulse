@@ -37,7 +37,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
-const isProd = process.env.NODE_ENV === 'production';
+const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve(__dirname, 'dist', 'index.html'));
 
 const BLOCKED_BROADCASTERS = [
   'icc',
@@ -67,10 +67,10 @@ const thumbnails = new Map<string, string>();
 // ClipPulse v6 — /tmp is a 512MB tmpfs. Renders used to leave their whole
 // workDir (downloaded section + output, 60-300MB each) there, so a few 4K
 // renders filled it and later jobs died with ENOSPC ("Conversion failed!").
-// Finished clips now move to the home disk; only the in-flight download
+// Finished clips now move to the home disk or project-local directory; only the in-flight download
 // lives in /tmp, and it is deleted right after the render (or on failure).
-const RENDERS_DIR = path.join(os.homedir(), 'workspace', 'clippulse', 'renders');
-const UPLOADS_DIR = path.join(os.homedir(), 'workspace', 'clippulse', 'uploads');
+const RENDERS_DIR = process.env.RENDERS_DIR || path.join(__dirname, 'renders');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
 fs.mkdirSync(RENDERS_DIR, { recursive: true });
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
@@ -121,13 +121,15 @@ const uploadedVideos = new Map<
 let cachedYtDlpBin: string | null | undefined;
 function resolveYtDlpBinary(): string | null {
   if (cachedYtDlpBin !== undefined) return cachedYtDlpBin;
+  const isWin = process.platform === 'win32';
   const candidates = [
     'yt-dlp',
+    ...(isWin ? ['yt-dlp.exe'] : []),
     '/usr/local/bin/yt-dlp',
     // v2 fix: the usual pip/user install location was missing, so a server
     // restarted without ~/.local/bin on PATH silently lost yt-dlp.
     path.join(os.homedir(), '.local', 'bin', 'yt-dlp'),
-    path.join(os.tmpdir(), 'clippulse-bin', 'yt-dlp'),
+    path.join(os.tmpdir(), 'clippulse-bin', isWin ? 'yt-dlp.exe' : 'yt-dlp'),
   ];
   for (const bin of candidates) {
     try {
@@ -142,6 +144,27 @@ function resolveYtDlpBinary(): string | null {
   }
   cachedYtDlpBin = null;
   return null;
+}
+
+let cachedPythonBin: string | null | undefined;
+function resolvePythonBinary(): string {
+  if (cachedPythonBin !== undefined && cachedPythonBin !== null) return cachedPythonBin;
+  const candidates = process.platform === 'win32'
+    ? ['python', 'py', 'python3']
+    : ['python3', 'python'];
+  for (const bin of candidates) {
+    try {
+      const res = spawnSync(bin, ['--version'], { stdio: 'ignore', timeout: 5000 });
+      if (res.status === 0) {
+        cachedPythonBin = bin;
+        return bin;
+      }
+    } catch {
+      // Try next candidate
+    }
+  }
+  cachedPythonBin = 'python3';
+  return cachedPythonBin;
 }
 
 async function ensureYtDlpAvailable(): Promise<void> {
@@ -173,6 +196,29 @@ function hasBinary(cmd: string): boolean {
   } catch {
     return false;
   }
+}
+
+let cachedHasAssFilter: boolean | undefined;
+function hasFfmpegAssFilter(): boolean {
+  if (cachedHasAssFilter !== undefined) return cachedHasAssFilter;
+  try {
+    const res = spawnSync('ffmpeg', ['-h', 'filter=ass'], { stdio: 'pipe', timeout: 3000 });
+    const output = (res.stdout?.toString() || '') + (res.stderr?.toString() || '');
+    cachedHasAssFilter = !output.includes("Unknown filter 'ass'") && res.status === 0;
+  } catch {
+    cachedHasAssFilter = false;
+  }
+  return cachedHasAssFilter;
+}
+
+function getAssFilter(hasValidAss: boolean): string {
+  if (!hasValidAss || !hasFfmpegAssFilter()) return '';
+  const fontsDir = path.resolve(__dirname, 'public', 'fonts');
+  if (fs.existsSync(fontsDir)) {
+    const safeDir = fontsDir.replace(/\\/g, '/');
+    return `,ass=captions.ass:fontsdir='${safeDir}'`;
+  }
+  return ',ass=captions.ass';
 }
 
 function runProcess(cmd: string, args: string[], cwd?: string): Promise<void> {
@@ -320,7 +366,7 @@ async function detectScenes(
   const script = path.resolve(__dirname, 'scripts', 'detect_scenes.py');
   if (fs.existsSync(script)) {
     try {
-      const out = await runProcessCapture('python3', [script, videoPath, 'adaptive'], 90000);
+      const out = await runProcessCapture(resolvePythonBinary(), [script, videoPath, 'adaptive'], 90000);
       const parsed = JSON.parse(out) as Array<{ startSec: number; endSec: number }>;
       if (Array.isArray(parsed) && parsed.length > 0) {
         const cuts = parsed
@@ -384,7 +430,7 @@ async function detectSceneFaces(framePaths: string[]): Promise<Array<number | nu
     return framePaths.map(() => null);
   }
   try {
-    const out = await runProcessCapture('python3', [script, ...framePaths], 90000);
+    const out = await runProcessCapture(resolvePythonBinary(), [script, ...framePaths], 90000);
     const parsed = JSON.parse(out) as Array<number | null>;
     if (Array.isArray(parsed) && parsed.length === framePaths.length) return parsed;
     return framePaths.map(() => null);
@@ -466,6 +512,8 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
 // ---- ClipPulse v2: real-signal helpers (no synthetic presets) ----
 
 function formatMmSs(totalSec: number): string {
@@ -509,6 +557,7 @@ async function transcribeWithGroqWhisper(
       form.append('file', new Blob([buf], { type: 'audio/mpeg' }), 'chunk.mp3');
       form.append('model', 'whisper-large-v3-turbo');
       form.append('response_format', 'verbose_json');
+      form.append('timestamp_granularities[]', 'word');
       try {
         gRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
           method: 'POST',
@@ -576,7 +625,7 @@ async function transcribeAudioFile(
     const mp3Buf = fs.readFileSync(mp3Path);
     if (mp3Buf.length === 0 || mp3Buf.length >= 15 * 1024 * 1024) return '';
     const aiRes = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: [
         {
           role: 'user',
@@ -645,7 +694,7 @@ async function detectFacecam(videoPath: string): Promise<FacecamResult> {
   const script = path.resolve(__dirname, 'scripts', 'detect_facecam.py');
   if (!fs.existsSync(script)) return null;
   try {
-    const out = await runProcessCapture('python3', [script, videoPath], 90000);
+    const out = await runProcessCapture(resolvePythonBinary(), [script, videoPath], 90000);
     const parsed = JSON.parse(out) as FacecamResult & { error?: string };
     if (parsed && !parsed.error) return parsed;
     return null;
@@ -671,7 +720,7 @@ async function detectCambox(videoPath: string): Promise<CamboxResult> {
   const script = path.resolve(__dirname, 'scripts', 'detect_cambox.py');
   if (!fs.existsSync(script)) return null;
   try {
-    const out = await runProcessCapture('python3', [script, videoPath], 90000);
+    const out = await runProcessCapture(resolvePythonBinary(), [script, videoPath], 90000);
     const parsed = JSON.parse(out) as CamboxResult & { error?: string };
     if (parsed && !parsed.error) return parsed;
     return null;
@@ -723,6 +772,7 @@ async function startServer() {
     res.json({
       hasYtDlp,
       hasFfmpeg,
+      hasAssFilter: hasFfmpegAssFilter(),
       canRenderLocally: hasYtDlp && hasFfmpeg,
       canRenderPreviewSample: hasFfmpeg,
       canUploadVideo: hasFfmpeg,
@@ -812,7 +862,7 @@ async function startServer() {
             const mp3Buf = fs.readFileSync(mp3Path);
             if (mp3Buf.length > 0 && mp3Buf.length < 15 * 1024 * 1024) {
               const aiRes = await ai.models.generateContent({
-                model: 'gemini-3.8-flash',
+                model: GEMINI_MODEL,
                 contents: [
                   {
                     role: 'user',
@@ -989,7 +1039,7 @@ async function startServer() {
       if (!ai) return null;
       try {
         const aiRes = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: GEMINI_MODEL,
           contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
           config: { responseMimeType: 'application/json' },
         });
@@ -1263,7 +1313,7 @@ async function startServer() {
     if (ai) {
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: GEMINI_MODEL,
           contents:
             'What is the latest official Rockstar Games / Take-Two release date and current launch status for GTA 6 (Grand Theft Auto VI) including any trailers or gameplay reveals? Give a concise 2-3 sentence summary with exact dates.',
           config: {
@@ -1582,7 +1632,7 @@ async function startServer() {
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: [
           `Video title: ${videoTitle}`,
           `Category: ${category}`,
@@ -1777,7 +1827,7 @@ async function startServer() {
         const visualTransform = copyrightSafeTransform
           ? `${flipFilter},eq=contrast=1.08:saturation=1.18:brightness=0.02,unsharp=5:5:0.8:5:5:0.0,vignette=PI/5`
           : flipFilter;
-        const assFilter = hasValidAss ? ',ass=captions.ass' : '';
+        const assFilter = getAssFilter(hasValidAss);
 
         const ffmpegArgs: string[] = [
           '-y',
@@ -1935,7 +1985,7 @@ async function startServer() {
       const visualTransform = copyrightSafeTransform
         ? `${flipFilter},eq=contrast=1.08:saturation=1.18:brightness=0.02,unsharp=5:5:0.8:5:5:0.0,vignette=PI/5`
         : flipFilter;
-      const assFilter = hasValidAss ? ',ass=captions.ass' : '';
+      const assFilter = getAssFilter(hasValidAss);
       const audioMap = isRealUpload && !hasAudioStream ? '1:a' : '0:a?';
 
       let sceneInfo: Array<{ startSec: number; endSec: number; faceX: number | null; layout: string }> = [];
@@ -2378,7 +2428,7 @@ async function startServer() {
       await runProcess('ffmpeg', ['-y', '-ss', String(peakSec), '-i', clipPath, '-frames:v', '1', '-q:v', '2', framePath]);
       const scriptPath = path.resolve(__dirname, 'scripts', 'make_thumbnail.py');
       await runProcessCapture(
-        'python3',
+        resolvePythonBinary(),
         [scriptPath, '--frame', framePath, '--title', title, '--subtitle', subtitle, '--output', thumbPath],
         60000,
       );

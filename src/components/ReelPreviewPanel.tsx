@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Eye, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert, Video } from 'lucide-react';
+import { AlertCircle, Check, Download, ExternalLink, Eye, Loader2, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert, Sparkles, Video } from 'lucide-react';
 import {
   CAPTION_STYLE_PRESETS,
   applyCaptionOverrides,
   assColourToCss,
   evaluateCopyrightSafety,
   extractWordsFromSegments,
+  generateAssSubtitle,
   positionPctForPreset,
 } from '../lib/virality';
 import type { CaptionStylePreset } from '../lib/virality';
@@ -89,6 +90,110 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
   const [showFaceBox, setShowFaceBox] = useState(true);
   const fgVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const [renderQuality, setRenderQuality] = useState<'720p' | '1080p' | '4k'>('1080p');
+  const [renderStatus, setRenderStatus] = useState<'idle' | 'rendering' | 'done' | 'failed'>('idle');
+  const [renderProgressMessage, setRenderProgressMessage] = useState<string>('');
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const [isNative4k, setIsNative4k] = useState<boolean>(false);
+
+  const handleRenderWorkbenchClip = async () => {
+    setRenderStatus('rendering');
+    setRenderError(null);
+    setDownloadUrl(null);
+    setStreamUrl(null);
+    setRenderProgressMessage(lang === 'bn' ? 'রেন্ডার শুরু হচ্ছে...' : 'Starting render...');
+
+    try {
+      const assContent = generateAssSubtitle(
+        source.segments,
+        selectedWindow.startSec,
+        selectedWindow.endSec,
+        hookText || selectedWindow.suggestedHooks[0] || '',
+        captionStyle,
+        includeCredit ? `Source: ${source.channel}` : undefined,
+        true,
+        undefined,
+        captionOverrides
+      );
+
+      const payload: Record<string, unknown> = {
+        title: source.title,
+        category: source.category,
+        outputQuality: renderQuality,
+        startSec: selectedWindow.startSec,
+        endSec: selectedWindow.endSec,
+        clipLengthSec: Math.round(selectedWindow.endSec - selectedWindow.startSec),
+        faceOffsetX,
+        framingMode,
+        assContent,
+        copyrightSafeTransform: transformPreview,
+        mirrorFlip,
+      };
+
+      if (source.uploadedVideoUrl) {
+        payload.uploadId = source.id.replace('upload-', '');
+      } else {
+        payload.youtubeUrl = source.youtubeUrl;
+      }
+
+      const res = await fetch('/api/render-local-mp4', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.message || data.reason || 'Could not start render.');
+      }
+
+      if (data.downloadUrl) {
+        setDownloadUrl(data.downloadUrl);
+        setStreamUrl(data.streamUrl || data.downloadUrl);
+        setRenderStatus('done');
+        return;
+      }
+
+      const jobId = data.jobId;
+      setRenderProgressMessage(
+        lang === 'bn'
+          ? 'FFmpeg দিয়ে ভিডিও প্রসেস ও ক্যাপশন বার্ন হচ্ছে...'
+          : 'FFmpeg is encoding 9:16 clip with burned captions...'
+      );
+
+      const startedAt = Date.now();
+      const timeoutMs = 30 * 60 * 1000;
+
+      while (Date.now() - startedAt < timeoutMs) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const statusRes = await fetch(`/api/job-status/${jobId}`);
+        if (!statusRes.ok) throw new Error('Job status check failed.');
+        const statusData = await statusRes.json();
+
+        if (statusData.status === 'done' && statusData.result) {
+          const result = statusData.result;
+          setDownloadUrl(result.downloadUrl || null);
+          setStreamUrl(result.streamUrl || result.downloadUrl || null);
+          setIsNative4k(Boolean(result.isNative4k));
+          setRenderStatus('done');
+          return;
+        }
+
+        if (statusData.status === 'failed') {
+          const errResult = statusData.result || {};
+          throw new Error(errResult.message || errResult.error || 'Render failed on server.');
+        }
+      }
+
+      throw new Error('Render timed out after 30 minutes.');
+    } catch (err) {
+      setRenderStatus('failed');
+      setRenderError(err instanceof Error ? err.message : 'Render failed.');
+    }
+  };
 
   const hasUploadedVideo = Boolean(source.uploadedVideoUrl);
 
@@ -731,6 +836,124 @@ export const ReelPreviewPanel: React.FC<ReelPreviewPanelProps> = ({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Render & Download Export Action Card */}
+        <div className="pt-4 mt-2 border-t border-slate-200 space-y-3 bg-slate-50 -mx-4 -mb-4 p-4 rounded-b-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+              <Sparkles className="w-4 h-4 text-rose-600" aria-hidden="true" />
+              <span>{lang === 'bn' ? 'এক্সপোর্ট ও রেন্ডার (FFmpeg)' : 'Render 9:16 Short (FFmpeg)'}</span>
+            </div>
+            {/* Quality selector */}
+            <div className="inline-flex p-0.5 bg-slate-200 rounded-md text-[11px] font-semibold">
+              {(['720p', '1080p', '4k'] as const).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={renderStatus === 'rendering'}
+                  onClick={() => setRenderQuality(q)}
+                  className={`px-2 py-0.5 rounded transition-colors cursor-pointer uppercase ${
+                    renderQuality === q
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {renderStatus === 'idle' && (
+            <button
+              type="button"
+              onClick={handleRenderWorkbenchClip}
+              className="w-full inline-flex items-center justify-center gap-2 h-10 px-4 text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-sm rounded-lg transition-all cursor-pointer"
+            >
+              <Download className="w-4 h-4" aria-hidden="true" />
+              <span>
+                {lang === 'bn'
+                  ? `রেন্ডার ও ডাউনলোড (${renderQuality.toUpperCase()})`
+                  : `Render & Download MP4 (${renderQuality.toUpperCase()})`}
+              </span>
+            </button>
+          )}
+
+          {renderStatus === 'rendering' && (
+            <div className="space-y-2 p-3 bg-white border border-rose-200 rounded-lg">
+              <div className="flex items-center gap-2 text-xs font-medium text-rose-700">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0 text-rose-600" />
+                <span className="truncate">{renderProgressMessage}</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                {lang === 'bn'
+                  ? 'লোকাল সার্ভারে FFmpeg দিয়ে প্রসেসিং চলছে। শেষ হলে ডাউনলোড লিংক আসবে।'
+                  : 'Processing locally with FFmpeg. Download link will appear once done.'}
+              </p>
+            </div>
+          )}
+
+          {renderStatus === 'done' && downloadUrl && (
+            <div className="space-y-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  {lang === 'bn' ? 'রেন্ডার সম্পন্ন!' : 'Render Ready!'}
+                </span>
+                {isNative4k && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-emerald-600 text-white rounded">
+                    Native 4K
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={downloadUrl}
+                  download
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-md transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{lang === 'bn' ? 'ভিডিও সেভ করুন (.mp4)' : 'Download .MP4'}</span>
+                </a>
+                {streamUrl && (
+                  <a
+                    href={streamUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center w-8 h-8 text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-md transition-colors"
+                    title={lang === 'bn' ? 'নতুন ট্যাবে দেখুন' : 'Stream video in new tab'}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setRenderStatus('idle')}
+                  className="px-2 h-8 text-xs text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                >
+                  {lang === 'bn' ? 'আবার' : 'Reset'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {renderStatus === 'failed' && (
+            <div className="space-y-2 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+              <div className="flex items-start gap-1.5 text-xs text-rose-700 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                <span className="break-words">{renderError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRenderWorkbenchClip}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 hover:text-rose-900 underline cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>{lang === 'bn' ? 'আবার চেষ্টা করুন' : 'Try Again'}</span>
+              </button>
             </div>
           )}
         </div>

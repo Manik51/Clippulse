@@ -10,11 +10,33 @@ Usage:
         --subtitle "KNOCKOUT • 03:45" --output thumb.jpg [--accent DC2626]
 """
 import argparse
+import os
+import sys
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 W, H = 1280, 720
-FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+
+def get_fonts():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(script_dir, "..", "public", "fonts", "Anton-Regular.ttf"),
+        os.path.join(script_dir, "..", "public", "fonts", "Montserrat-ExtraBold.ttf"),
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "C:\\Windows\\Fonts\\arialbd.ttf",
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/Library/Fonts/Arial Bold.ttf",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, 92), ImageFont.truetype(p, 40)
+            except Exception:
+                continue
+    default_font = ImageFont.load_default()
+    return default_font, default_font
 
 
 def wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
@@ -72,12 +94,11 @@ def main() -> int:
     margin = 64
     y = H - 64
 
-    title_font = ImageFont.truetype(FONT_BOLD, 92)
+    title_font, sub_font = get_fonts()
     lines = wrap(draw, args.title.upper(), title_font, W - 2 * margin)
     line_h = 104
     y = H - 64 - line_h * len(lines)
     if args.subtitle:
-        sub_font = ImageFont.truetype(FONT_BOLD, 40)
         sub_y = y - 62
         draw.rectangle([margin, sub_y + 6, margin + 14, sub_y + 46], fill=accent)
         draw.text((margin + 28, sub_y), args.subtitle.upper(), font=sub_font, fill=accent)

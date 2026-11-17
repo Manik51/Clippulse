@@ -197,9 +197,10 @@ ClipPulse is a **local-only tool with no authentication**. Run it on your own ma
 clippulse/
 ├── server.ts               # Express API: analyze, render, trending, jobs
 ├── src/
-│   ├── lib/virality.ts     # Scoring, captions (DOAC + Hormozi), DOAC layout
-│   └── components/         # TrendingClipsPanel, ExportModal, TopBar
+│   ├── lib/virality.ts     # Scoring, captions (18 styles), layout & timing
+│   └── components/         # ReelPreviewPanel, TrendingClipsPanel, TopBar
 ├── scripts/                # PySceneDetect, YuNet face detection, thumbnails
+├── requirements.txt        # Python dependencies (OpenCV, PySceneDetect, Pillow)
 ├── assets/                 # Logo (SVG + PNG), flow diagram, demo GIF, screenshots, how-to visual
 ├── examples/               # DOAC sample clip (history) + caption-style showcases (v8.7 set; v8.8 18-style refresh pending)
 ├── renders/                # Your rendered clips (git-ignored)

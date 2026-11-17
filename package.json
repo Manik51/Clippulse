@@ -23,9 +23,9 @@
     "setup:linux": "bash scripts/setup-local.sh",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "node --input-type=module -e \"import fs from 'fs'; fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('server.js', { force: true });\"",
     "lint": "tsc --noEmit",
-    "prod": "npm run build && NODE_ENV=production tsx server.ts",
+    "prod": "npm run build && tsx server.ts",
     "test": "tsx --test src/lib/virality.test.ts src/lib/gta6.test.ts"
   },
   "dependencies": {

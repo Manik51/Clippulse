@@ -598,7 +598,9 @@ test('v8.8 fonts: every font a preset names is installed', () => {
   for (const s of Object.keys(CAPTION_STYLE_PRESETS) as CaptionStyle[]) {
     const f = CAPTION_STYLE_PRESETS[s].font;
     assert.ok(FONT_FILES[f], `${s} font ${f} has a known file`);
-    assert.ok(fs.existsSync(path.join(os.homedir(), '.fonts', FONT_FILES[f])), `${s} font file ${FONT_FILES[f]} installed`);
+    const inHome = fs.existsSync(path.join(os.homedir(), '.fonts', FONT_FILES[f]));
+    const inPublic = fs.existsSync(path.join(process.cwd(), 'public', 'fonts', FONT_FILES[f]));
+    assert.ok(inHome || inPublic, `${s} font file ${FONT_FILES[f]} installed`);
   }
 });
 

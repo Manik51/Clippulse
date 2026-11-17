@@ -497,3 +497,30 @@ Manik's order, after looking at the README gallery: the videos play automaticall
 - Problems hit (all worked around, nothing faked): the server's direct YouTube render path is too slow for this VM's IP (ffmpeg pulls from googlevideo at a crawl — 2 Apex jobs sat 12+ min and were killed, 1 Boxing job 403'd) — switched to downloading each 30s section with yt-dlp (~20s) and rendering through the real `/api/render-local-mp4` pipeline via `/api/upload-video` (~2 min/job). A VM restart mid-task (server down, restarted, no work lost). yt-dlp section padding needed a precise cut at the first-frame pts (mkv `start_time` reads 0 — wrong field). One transient yt-dlp "n challenge solving failed" (retry OK); one corrupt yellow-burst section (re-download OK). Full-30s GIFs were 36–64 MB — regenerated as 6s excerpts per the v8.7 convention. Caveats: yellow-burst's window has very little speech (2 transcript segments — "We have to go." is the whole hook); sara's clip is only 7.3 MB (static talking-head compresses well); three clips are 29.2s rather than 30.0s (the same `-shortest` quirk as v8.7 — accepted as ~30s). Scratch driver `gallery-v89.ts` (repo root, excluded from pushes); raw renders in `~/workspace/gallery-v89/renders/`.
 - Retired from GitHub (deleted via web UI): the 7 stale v8.7 folders `karaoke`, `minimal`, `lime`, `sentence`, `top`, `flash`, `bold` (deleted locally already; `doac/` stays).
 - Pushed as commit `00fc984` (README.md, examples/styles/README.md, PRODUCTION-READY.md). Binaries via web UI, all verified on the styles listing (exactly the 18 new folders + doac + README.md): uploads ali `f6ae424`, axel `766e5a1`, cardone-a `ec10bab`, hollywood-fill `fec3018`, hormozi-2026-a `d5fc499`, hormozi-2026-b `ad3a222`, hormozi-2026-c `c78c490`, hormozi-2026-d `42147af`, hormozi-2026-e `68f6762`, hormozi-v1 `b79d48c`, iman-a `e7ea129`, mrbeast `f07adc3`, red-line `2d25f08`, roman `1a01535`, sara `92a44f6`, streamline `4a629db`, undercut `3a5be60`, yellow-burst `02a9f7e`; deletions of the 7 stale folders (karaoke, minimal, lime, sentence, top, flash, bold) across 21 file-delete commits.
+
+## v9.0 — Cross-Platform Compatibility & Workbench Render Action (2026-11-17)
+
+Key fixes and improvements across cross-platform portability, reliability, and UX:
+1. **Workbench Export Action Added**:
+   - Fixed missing render button in `ReelPreviewPanel.tsx` after the v8.8.1 top bar cleanup.
+   - Users can now select output quality (720p, 1080p, 4K) and render/download their MP4 directly from the Workbench tab with live status, polling, stream link, and direct download button.
+2. **Cross-Platform OS Compatibility (Windows / macOS / Linux)**:
+   - Python resolution: Replaced hardcoded `'python3'` with `resolvePythonBinary()` (`python`, `py`, `python3` detection).
+   - Renders & Uploads directory: Switched from hardcoded `~/workspace/clippulse/...` to configurable / project-local paths (`process.env.RENDERS_DIR || path.join(__dirname, 'renders')`).
+   - Cross-platform npm scripts: Fixed `npm run clean` with cross-platform Node script and `npm run prod` without Unix-specific `NODE_ENV=production` shell syntax.
+   - `scripts/make_thumbnail.py`: Cross-platform font loader with fallback to project fonts (`public/fonts/Anton-Regular.ttf`) and system fonts.
+3. **True Font Embedding (Zero Warning Build & Robust FFmpeg Burn-In)**:
+   - Downloaded and placed the 8 required OFL TTF fonts into `public/fonts/`.
+   - Vite production build now resolves all fonts cleanly with 0 warnings.
+   - Subtitle filter passes `:fontsdir=public/fonts` to libass.
+   - Added `hasFfmpegAssFilter()` detection to prevent crashes on minimal FFmpeg builds without `libass`.
+4. **AI & Speech-to-Text Reliability**:
+   - Fixed non-existent model `gemini-3.8-flash` -> `process.env.GEMINI_MODEL || 'gemini-2.5-flash'`.
+   - Enabled Groq Whisper word-level timestamps (`timestamp_granularities[] = word`).
+5. **Python Requirements**:
+   - Added `requirements.txt` (`opencv-python`, `scenedetect`, `Pillow`, `numpy`).
+   - Bundled the YuNet ONNX face detection model (`scripts/face_detection_yunet_2023mar.onnx`).
+6. **Verification**:
+   - `npm test`: 49/49 tests pass.
+   - `npm run lint`: 0 errors.
+   - `npm run build`: built in <800ms with 0 warnings.
